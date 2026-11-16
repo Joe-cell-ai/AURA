@@ -33,6 +33,22 @@ class HomeAssistantRequestValidatorTest {
         }
     }
 
+    @Test fun parsesAssistSpeechAndConversationId() {
+        val result = HomeAssistantConversationParser.parse(
+            """{"conversation_id":"abc123","response":{"speech":{"plain":{"speech":"The lights are on."}}}}"""
+        )
+        assertEquals("The lights are on.", result.text)
+        assertEquals("abc123", result.conversationId)
+    }
+
+    @Test fun parserUsesFallbackWhenSpeechIsMissing() {
+        val result = HomeAssistantConversationParser.parse(
+            """{"response":{"response":"Done."}}"""
+        )
+        assertEquals("Done.", result.text)
+        assertEquals(null, result.conversationId)
+    }
+
     @Test fun rejectsUnsupportedOrMalformedEntities() {
         listOf("sensor.temperature", "light", "light.bad/name", "unknown.device").forEach { value ->
             val error = runCatching { HomeAssistantRequestValidator.entityId(value) }.exceptionOrNull()
