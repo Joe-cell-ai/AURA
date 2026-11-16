@@ -83,7 +83,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) tts?.language = Locale.getDefault()
     }
-    fun speak(text: String) { tts?.speak(text.take(3000), TextToSpeech.QUEUE_FLUSH, null, "aura-response") }
+    fun speak(text: String, languageTag: String = Locale.getDefault().toLanguageTag()) {
+        val locale = Locale.forLanguageTag(languageTag)
+        val availability = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+        if (availability >= TextToSpeech.LANG_AVAILABLE) tts?.language = locale
+        tts?.speak(text.take(3000), TextToSpeech.QUEUE_FLUSH, null, "aura-response")
+    }
     fun stopSpeaking() { tts?.stop() }
     override fun onDestroy() { tts?.stop(); tts?.shutdown(); super.onDestroy() }
 }
@@ -120,6 +125,7 @@ private fun AuraApp(activity: MainActivity) {
     var selectedTab by remember { mutableStateOf("home") }
     var status by remember { mutableStateOf(if (secure.get("ai_endpoint").isBlank() || secure.get("ai_model").isBlank()) "Set up an AI provider in Settings to start chatting." else "AI provider settings loaded.") }
     var speakReplies by remember { mutableStateOf(secure.get("speak_replies", "true") == "true") }
+    var voiceLanguage by remember { mutableStateOf(secure.get("voice_language", "system")) }
     var showHaConfirm by remember { mutableStateOf(false) }
     var haDiscoverOpen by remember { mutableStateOf(false) }
     var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
@@ -199,6 +205,8 @@ private fun AuraApp(activity: MainActivity) {
             haUrl, { haUrl = it }, haToken, { haToken = it }, haEntity, { haEntity = it },
             speakReplies = speakReplies,
             onSpeakReplies = { speakReplies = it; secure.put("speak_replies", it.toString()) },
+            voiceLanguage = voiceLanguage,
+            onVoiceLanguage = { voiceLanguage = it; secure.put("voice_language", it) },
             providerTesting = providerTesting,
             providerTestResult = providerTestResult,
             onTestConnection = {
@@ -286,6 +294,7 @@ private fun AuraApp(activity: MainActivity) {
                     onStart = {
                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            if (voiceLanguage != "system") putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguage)
                             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                             putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
                         }
@@ -420,6 +429,7 @@ private fun AuraApp(activity: MainActivity) {
                         IconButton(onClick = {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                if (voiceLanguage != "system") putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguage)
                                 putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                                 putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
                             }
@@ -472,7 +482,7 @@ Protect secrets and personal data. Keep answers clear and appropriately concise.
                                     } else messages += UiMessage("assistant", cleaned)
                                     store.add("assistant", cleaned)
                                     status = "Connected • Conversation stored locally."
-                                    if (speakReplies) activity.speak(cleaned)
+                                    if (speakReplies) activity.speak(cleaned, voiceLanguage.takeIf { it != "system" } ?: Locale.getDefault().toLanguageTag())
                                 } catch (e: Exception) {
                                     if (messages.lastOrNull()?.role == "assistant" && messages.last().content.startsWith("__STREAM__")) {
                                         messages.removeAt(messages.lastIndex)
@@ -854,10 +864,12 @@ private fun SettingsScreen(
     haToken: String, onHaToken: (String) -> Unit,
     haEntity: String, onHaEntity: (String) -> Unit,
     speakReplies: Boolean, onSpeakReplies: (Boolean) -> Unit,
+    voiceLanguage: String, onVoiceLanguage: (String) -> Unit,
     providerTesting: Boolean, providerTestResult: String, onTestConnection: () -> Unit,
     onSave: () -> Unit, onBack: () -> Unit
 ) {
     var expanded by remember { mutableStateOf("AI Provider & Endpoint") }
+    var voiceLanguageMenuOpen by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("‹", color = Cyan, fontSize = 28.sp) }
@@ -905,7 +917,22 @@ private fun SettingsScreen(
                 }
                 Switch(checked = speakReplies, onCheckedChange = onSpeakReplies)
             }
-            Text("Speech input uses the speech recognizer available on your Android device. Offline recognition depends on installed language packs.", color = Color.LightGray, fontSize = 11.sp)
+            Text("Voice language", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Box {
+                TextButton(onClick = { voiceLanguageMenuOpen = true }) {
+                    Text(when (voiceLanguage) {
+                        "hi-IN" -> "Hindi"; "te-IN" -> "Telugu"; "ta-IN" -> "Tamil"
+                        "kn-IN" -> "Kannada"; "bn-IN" -> "Bengali"; "en-IN" -> "English (India)"
+                        else -> "System default"
+                    }, color = Cyan)
+                }
+                DropdownMenu(expanded = voiceLanguageMenuOpen, onDismissRequest = { voiceLanguageMenuOpen = false }) {
+                    listOf("system" to "System default", "en-IN" to "English (India)", "hi-IN" to "Hindi", "te-IN" to "Telugu", "ta-IN" to "Tamil", "kn-IN" to "Kannada", "bn-IN" to "Bengali").forEach { (tag, label) ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = { onVoiceLanguage(tag); voiceLanguageMenuOpen = false })
+                    }
+                }
+            }
+            Text("The selected language is requested from Android speech recognition and used for spoken replies when your installed TTS engine supports it. Availability depends on installed language packs.", color = Color.LightGray, fontSize = 11.sp)
         }
         SettingsGroup("◈", "Appearance", "Dark navy • cyan • violet", expanded == "Appearance", { expanded = if (expanded == "Appearance") "" else "Appearance" }) {
             Text("The current AURA interface uses the dark navy theme with cyan and violet accents. Additional selectable themes are not available yet.", color = Color.LightGray, fontSize = 12.sp)
