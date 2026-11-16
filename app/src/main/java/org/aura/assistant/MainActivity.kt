@@ -105,18 +105,20 @@ private fun AuraApp(activity: MainActivity) {
     val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf<UiMessage>() }
     var input by remember { mutableStateOf("") }
-    var endpoint by remember { mutableStateOf(secure.get("ai_endpoint", "https://YOUR-HOST/v1/chat/completions")) }
+    var endpoint by remember { mutableStateOf(secure.get("ai_endpoint")) }
     var webSearchEndpoint by remember { mutableStateOf(secure.get("web_search_endpoint")) }
-    var model by remember { mutableStateOf(secure.get("ai_model", "your-model-name")) }
+    var model by remember { mutableStateOf(secure.get("ai_model")) }
     var apiKey by remember { mutableStateOf(secure.get("ai_key")) }
     var haUrl by remember { mutableStateOf(secure.get("ha_url")) }
     var haToken by remember { mutableStateOf(secure.get("ha_token")) }
     var haEntity by remember { mutableStateOf(secure.get("ha_entity", "light.living_room")) }
     var packageName by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var providerTesting by remember { mutableStateOf(false) }
+    var providerTestResult by remember { mutableStateOf("") }
     var settingsOpen by remember { mutableStateOf(false) }
     var selectedTab by remember { mutableStateOf("home") }
-    var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
+    var status by remember { mutableStateOf(if (secure.get("ai_endpoint").isBlank() || secure.get("ai_model").isBlank()) "Set up an AI provider in Settings to start chatting." else "AI provider settings loaded.") }
     var speakReplies by remember { mutableStateOf(secure.get("speak_replies", "true") == "true") }
     var showHaConfirm by remember { mutableStateOf(false) }
     var haDiscoverOpen by remember { mutableStateOf(false) }
@@ -194,6 +196,25 @@ private fun AuraApp(activity: MainActivity) {
             haUrl, { haUrl = it }, haToken, { haToken = it }, haEntity, { haEntity = it },
             speakReplies = speakReplies,
             onSpeakReplies = { speakReplies = it; secure.put("speak_replies", it.toString()) },
+            providerTesting = providerTesting,
+            providerTestResult = providerTestResult,
+            onTestConnection = {
+                if (endpoint.isBlank() || model.isBlank()) {
+                    providerTestResult = "Enter an endpoint and model ID first."
+                } else {
+                    providerTesting = true
+                    providerTestResult = "Testing provider connection…"
+                    scope.launch {
+                        try {
+                            val reply = ai.stream(endpoint.trim(), model.trim(), apiKey, listOf(ChatMessage("user", "Reply with exactly: AURA connection successful.")), 64) { }
+                            if (reply.isBlank()) error("The provider returned an empty response.")
+                            providerTestResult = "Connection successful. The model returned a response."
+                        } catch (e: Exception) {
+                            providerTestResult = e.message ?: "Connection test failed."
+                        } finally { providerTesting = false }
+                    }
+                }
+            },
             onSave = {
                 secure.put("ai_endpoint", endpoint.trim())
                 secure.put("ai_model", model.trim())
@@ -376,7 +397,7 @@ private fun AuraApp(activity: MainActivity) {
                                 status = "Speech recognition is not available on this device."
                             }
                         }) { Icon(Icons.Default.Mic, contentDescription = "Speak", tint = Cyan) }
-                        IconButton(enabled = !busy && (input.isNotBlank() || imageUri != null || documentText != null), onClick = {
+                        IconButton(enabled = !busy && endpoint.isNotBlank() && model.isNotBlank() && (input.isNotBlank() || imageUri != null || documentText != null), onClick = {
                             val prompt = input.trim()
                             val imageToSend = imageUri
                             val documentToSend = documentText
@@ -765,6 +786,7 @@ private fun SettingsScreen(
     haToken: String, onHaToken: (String) -> Unit,
     haEntity: String, onHaEntity: (String) -> Unit,
     speakReplies: Boolean, onSpeakReplies: (Boolean) -> Unit,
+    providerTesting: Boolean, providerTestResult: String, onTestConnection: () -> Unit,
     onSave: () -> Unit, onBack: () -> Unit
 ) {
     var expanded by remember { mutableStateOf("AI Provider & Endpoint") }
@@ -790,10 +812,12 @@ private fun SettingsScreen(
         Spacer(Modifier.height(16.dp))
 
         SettingsGroup("☁", "AI Provider & Endpoint", "Configure cloud AI", expanded == "AI Provider & Endpoint", { expanded = if (expanded == "AI Provider & Endpoint") "" else "AI Provider & Endpoint" }) {
-            Text("Connect any trusted OpenAI-compatible HTTPS endpoint.", color = Color.LightGray, fontSize = 11.sp)
-            OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
+            Text("AURA does not include a hosted AI account. Add an OpenAI-compatible HTTPS chat-completions endpoint, model ID and (if required) your own key. Credentials are encrypted on this device.", color = Color.LightGray, fontSize = 11.sp)
+            OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, placeholder = { Text("https://your-provider.example/v1/chat/completions") }, singleLine = true)
             OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
-            OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+            OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (if required)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+            OutlinedButton(onClick = onTestConnection, enabled = !providerTesting && endpoint.isNotBlank() && model.isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text(if (providerTesting) "Testing…" else "Test AI connection") }
+            if (providerTestResult.isNotBlank()) Text(providerTestResult, color = if (providerTestResult.startsWith("Connection successful")) Cyan else Color.LightGray, fontSize = 11.sp)
         }
         SettingsGroup("⌕", "Web Search", "Optional SearXNG connection", expanded == "Web Search", { expanded = if (expanded == "Web Search") "" else "Web Search" }) {
             Text("Use your own self-hosted search service.", color = Color.LightGray, fontSize = 11.sp)
