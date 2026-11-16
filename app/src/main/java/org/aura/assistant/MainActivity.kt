@@ -2,6 +2,7 @@ package org.aura.assistant
 
 import android.content.Intent
 import android.os.Bundle
+import android.net.Uri
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
@@ -29,10 +30,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.aura.assistant.actions.AndroidActions
 import org.aura.assistant.ai.ChatMessage
 import org.aura.assistant.ai.OpenAiCompatibleClient
 import org.aura.assistant.data.ConversationStore
+import org.aura.assistant.data.AttachmentReader
 import org.aura.assistant.data.MemoryStore
 import org.aura.assistant.data.StoredMessage
 import org.aura.assistant.security.SecureSettings
@@ -96,6 +100,9 @@ private fun AuraApp(activity: MainActivity) {
     var memoryItems by remember { mutableStateOf(memoryStore.all()) }
     var memoryDraft by remember { mutableStateOf("") }
     var editingMemoryId by remember { mutableStateOf<Long?>(null) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var documentText by remember { mutableStateOf<String?>(null) }
+    var attachmentStatus by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         store.recent().forEach { messages += UiMessage(it.role, it.content) }
@@ -106,6 +113,22 @@ private fun AuraApp(activity: MainActivity) {
         val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (!spoken.isNullOrBlank()) { input = spoken; status = "Speech captured. Review it, then tap Send." }
         else status = "No speech was captured. Try again when ready."
+    }
+
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        imageUri = uri
+        attachmentStatus = if (uri == null) "" else "Image selected; it will be compressed before upload."
+    }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                documentText = AttachmentReader.documentText(context, uri)
+                attachmentStatus = "Text document attached (maximum 32 KB)."
+            } catch (e: Exception) {
+                documentText = null
+                attachmentStatus = e.message ?: "Could not read document."
+            }
+        }
     }
 
     if (settingsOpen) {
@@ -161,6 +184,14 @@ private fun AuraApp(activity: MainActivity) {
                     }
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { imagePicker.launch(arrayOf("image/*")) }) { Text("Add image") }
+                OutlinedButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("Add text file") }
+                if (imageUri != null || documentText != null) {
+                    TextButton(onClick = { imageUri = null; documentText = null; attachmentStatus = "" }) { Text("Remove") }
+                }
+            }
+            if (attachmentStatus.isNotBlank()) Text(attachmentStatus, color = Color.LightGray, fontSize = 11.sp)
             OutlinedTextField(
                 value = input, onValueChange = { input = it }, modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Message AURA…") }, maxLines = 4,
@@ -179,7 +210,12 @@ private fun AuraApp(activity: MainActivity) {
                         }) { Icon(Icons.Default.Mic, contentDescription = "Speak", tint = Cyan) }
                         IconButton(enabled = !busy && input.isNotBlank(), onClick = {
                             val prompt = input.trim()
+                            val imageToSend = imageUri
+                            val documentToSend = documentText
                             input = ""
+                            imageUri = null
+                            documentText = null
+                            attachmentStatus = ""
                             messages += UiMessage("user", prompt)
                             store.add("user", prompt)
                             val history = buildList {
@@ -192,7 +228,10 @@ private fun AuraApp(activity: MainActivity) {
                             status = "Connecting to your configured AI endpoint…"
                             scope.launch {
                                 try {
-                                    val answer = ai.stream(endpoint, model, apiKey, history, 512) { delta ->
+                                    val imageData = imageToSend?.let { uri ->
+                                        withContext(Dispatchers.IO) { AttachmentReader.imageDataUrl(context, uri) }
+                                    }
+                                    val answer = ai.stream(endpoint, model, apiKey, history, 512, imageData, documentToSend) { delta ->
                                         // Accumulate streaming text in a single assistant bubble.
                                         if (messages.lastOrNull()?.role == "assistant" && messages.last().content.startsWith("__STREAM__")) {
                                             val previous = messages.removeAt(messages.lastIndex)
