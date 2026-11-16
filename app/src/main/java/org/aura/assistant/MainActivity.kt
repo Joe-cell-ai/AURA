@@ -1,6 +1,9 @@
 package org.aura.assistant
 
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.net.Uri
 import android.speech.RecognizerIntent
@@ -9,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aura.assistant.actions.AndroidActions
+import org.aura.assistant.automation.ReminderScheduler
 import org.aura.assistant.ai.ChatMessage
 import org.aura.assistant.ai.OpenAiCompatibleClient
 import org.aura.assistant.ai.WebSearchClient
@@ -100,6 +105,9 @@ private fun AuraApp(activity: MainActivity) {
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
     var speakReplies by remember { mutableStateOf(true) }
     var showHaConfirm by remember { mutableStateOf(false) }
+    var showScheduledReminder by remember { mutableStateOf(false) }
+    var scheduledTitle by remember { mutableStateOf("") }
+    var scheduledDelay by remember { mutableStateOf("15") }
     var pendingHaService by remember { mutableStateOf("toggle") }
     var memoryOpen by remember { mutableStateOf(false) }
     var memoryEnabled by remember { mutableStateOf(secure.get("memory_enabled", "false") == "true") }
@@ -113,6 +121,16 @@ private fun AuraApp(activity: MainActivity) {
     LaunchedEffect(Unit) {
         store.recent().forEach { messages += UiMessage(it.role, it.content) }
         memoryItems = memoryStore.all()
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            try {
+                ReminderScheduler(context).schedule(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L)
+                status = "Reminder scheduled on this device."
+                showScheduledReminder = false
+            } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
+        } else status = "Notification permission is needed to deliver scheduled reminders."
     }
 
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -298,8 +316,8 @@ private fun AuraApp(activity: MainActivity) {
             Text("Actions require your tap; AI replies cannot execute device commands.", color = Color.Gray, fontSize = 11.sp)
             var showReminder by remember { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { showReminder = true }, modifier = Modifier.weight(1f)) { Text("Create reminder") }
-                OutlinedButton(onClick = { settingsOpen = true }, modifier = Modifier.weight(1f)) { Text("Settings") }
+                OutlinedButton(onClick = { showReminder = true }, modifier = Modifier.weight(1f)) { Text("Calendar") }
+                OutlinedButton(onClick = { showScheduledReminder = true }, modifier = Modifier.weight(1f)) { Text("Schedule") }
             }
             Spacer(Modifier.height(8.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(16.dp)) {
@@ -404,6 +422,38 @@ private fun AuraApp(activity: MainActivity) {
                         }
                     }) { Text("Confirm") } },
                     dismissButton = { TextButton(onClick = { showHaConfirm = false }) { Text("Cancel") } }
+                )
+            }
+            if (showScheduledReminder) {
+                AlertDialog(
+                    onDismissRequest = { showScheduledReminder = false },
+                    title = { Text("Schedule a reminder") },
+                    text = {
+                        Column {
+                            OutlinedTextField(scheduledTitle, { scheduledTitle = it }, label = { Text("Reminder title") }, singleLine = true)
+                            OutlinedTextField(scheduledDelay, { scheduledDelay = it.filter(Char::isDigit).take(5) }, label = { Text("Minutes from now (1–10080)") }, singleLine = true)
+                            Text("Runs locally using Android background scheduling. Notifications must be allowed.", color = Color.LightGray, fontSize = 11.sp)
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val delay = scheduledDelay.toLongOrNull()
+                            if (delay == null || delay !in 1L..10080L) {
+                                status = "Choose a delay from 1 to 10080 minutes."
+                            } else if (Build.VERSION.SDK_INT >= 33 &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                try {
+                                    ReminderScheduler(context).schedule(scheduledTitle, delay)
+                                    status = "Reminder scheduled on this device."
+                                    showScheduledReminder = false
+                                } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
+                            }
+                        }) { Text("Schedule") }
+                    },
+                    dismissButton = { TextButton(onClick = { showScheduledReminder = false }) { Text("Cancel") } }
                 )
             }
             if (showReminder) {
