@@ -257,7 +257,7 @@ private fun AuraApp(activity: MainActivity) {
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AuraQuickTile("Open Apps", "▦") { selectedTab = "chat"; status = "Enter an installed app package below to open it." }
-                    AuraQuickTile("Set Reminder", "▦") { showScheduledReminder = true }
+                    AuraQuickTile("Set Reminder", "▦") { selectedTab = "automations"; showScheduledReminder = true }
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -267,10 +267,46 @@ private fun AuraApp(activity: MainActivity) {
             } else if (selectedTab == "voice") {
                 Spacer(Modifier.height(18.dp))
                 AuraVoicePanel(onStop = { activity.stopSpeaking(); selectedTab = "chat" })
+            } else if (selectedTab == "memories") {
+                Spacer(Modifier.height(8.dp))
+                AuraMemoriesPage(
+                    memories = memoryItems,
+                    enabled = memoryEnabled,
+                    onEnabled = { memoryEnabled = it; secure.put("memory_enabled", it.toString()) },
+                    onAdd = { memoryDraft = ""; editingMemoryId = null; memoryOpen = true },
+                    onEdit = { memoryDraft = it.content; editingMemoryId = it.id; memoryOpen = true },
+                    onDelete = { memoryStore.delete(it); memoryItems = memoryStore.all() },
+                    onExport = {
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AURA memory export", memoryStore.exportText()))
+                        status = "Memory export copied to clipboard."
+                    },
+                    onDeleteAll = { memoryStore.clear(); memoryItems = emptyList() }
+                )
+            } else if (selectedTab == "automations") {
+                Spacer(Modifier.height(8.dp))
+                AuraAutomationsPage(
+                    onCreate = { showScheduledReminder = true },
+                    onCancelAll = {
+                        ReminderScheduler(context).cancelAll()
+                        actionAudit.record("Reminders", "All pending reminders cancelled")
+                        status = "All pending AURA reminders cancelled."
+                    }
+                )
+            } else if (selectedTab == "extensions") {
+                Spacer(Modifier.height(8.dp))
+                AuraExtensionsPage(
+                    extensions = ExtensionCatalog.entries.map { Triple(it.manifest.name, it.description, extensionGrants.isGranted(it.manifest.id)) },
+                    onGrantChange = { name, granted ->
+                        ExtensionCatalog.entries.firstOrNull { it.manifest.name == name }?.let {
+                            extensionGrants.setGranted(it.manifest.id, granted)
+                            extensionRefresh++
+                        }
+                    }
+                )
             } else {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (selectedTab == "chat") "AURA Chat" else "AURA", color = Color.White,
-                        fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Text("AURA Chat", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.weight(1f))
                     TextButton(onClick = { selectedTab = "home" }) { Text("Home", color = Cyan) }
                 }
@@ -467,11 +503,8 @@ private fun AuraApp(activity: MainActivity) {
             }
             AuraBottomNavigation(selected = selectedTab, onSelect = { tab ->
                 selectedTab = tab
-                when (tab) {
-                    "memories" -> { memoryItems = memoryStore.all(); memoryOpen = true }
-                    "automations" -> showScheduledReminder = true
-                    "extensions" -> { extensionsOpen = true; extensionRefresh++ }
-                }
+                if (tab == "memories") memoryItems = memoryStore.all()
+                if (tab == "extensions") extensionRefresh++
             })
             Spacer(Modifier.height(4.dp))
             if (memoryOpen) {
@@ -626,7 +659,7 @@ private fun AuraApp(activity: MainActivity) {
             }
             if (showScheduledReminder) {
                 AlertDialog(
-                    onDismissRequest = { showScheduledReminder = false; selectedTab = "home" },
+                    onDismissRequest = { showScheduledReminder = false; selectedTab = "automations" },
                     title = { Text("Schedule a reminder") },
                     text = {
                         Column {
@@ -696,7 +729,7 @@ private fun AuraApp(activity: MainActivity) {
                                 actionAudit.record("Reminders", "All pending reminders cancelled")
                                 status = "All pending AURA reminders cancelled."
                             }) { Text("Cancel all") }
-                            TextButton(onClick = { showScheduledReminder = false; selectedTab = "home" }) { Text("Close") }
+                            TextButton(onClick = { showScheduledReminder = false; selectedTab = "automations" }) { Text("Close") }
                             }
                         }
                     }
