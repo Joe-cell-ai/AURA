@@ -191,6 +191,8 @@ private fun AuraApp(activity: MainActivity) {
             endpoint, { endpoint = it }, model, { model = it }, apiKey, { apiKey = it },
             webSearchEndpoint, { webSearchEndpoint = it },
             haUrl, { haUrl = it }, haToken, { haToken = it }, haEntity, { haEntity = it },
+            speakReplies = speakReplies,
+            onSpeakReplies = { speakReplies = it; secure.put("speak_replies", it.toString()) },
             onSave = {
                 secure.put("ai_endpoint", endpoint.trim())
                 secure.put("ai_model", model.trim())
@@ -761,52 +763,101 @@ private fun SettingsScreen(
     haUrl: String, onHaUrl: (String) -> Unit,
     haToken: String, onHaToken: (String) -> Unit,
     haEntity: String, onHaEntity: (String) -> Unit,
+    speakReplies: Boolean, onSpeakReplies: (Boolean) -> Unit,
     onSave: () -> Unit, onBack: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(18.dp)) {
+    var expanded by remember { mutableStateOf("AI Provider & Endpoint") }
+    Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("‹  BACK", color = Cyan, fontWeight = FontWeight.Bold) }
+            TextButton(onClick = onBack) { Text("‹", color = Cyan, fontSize = 28.sp) }
             Spacer(Modifier.weight(1f))
-            Text("AURA", color = Violet, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
+            Text("SETTINGS", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
         }
-        Text("Settings", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Personalise your assistant and connected services", color = Color(0xFF9DB7D8), fontSize = 12.sp)
-        Spacer(Modifier.height(18.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("☁  AI PROVIDER", color = Cyan, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text("Connect any trusted OpenAI-compatible HTTPS endpoint.", color = Color.LightGray, fontSize = 11.sp)
-                OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
-                OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
-                OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(58.dp).background(Brush.linearGradient(listOf(Cyan, Violet)), CircleShape), contentAlignment = Alignment.Center) {
+                Text("∞", color = Color.White, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text("AURA", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Your Smart AI Assistant  •  v0.6.0", color = Color(0xFF9DB7D8), fontSize = 11.sp)
             }
         }
         Spacer(Modifier.height(12.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("⌕  WEB SEARCH", color = Cyan, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text("Optional self-hosted SearXNG service.", color = Color.LightGray, fontSize = 11.sp)
-                OutlinedTextField(webSearchEndpoint, onWebSearchEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS SearXNG /search URL") }, singleLine = true)
-            }
+        Text("Personalise your assistant", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("Manage connections, voice, appearance and privacy.", color = Color(0xFF9DB7D8), fontSize = 12.sp)
+        Spacer(Modifier.height(16.dp))
+
+        SettingsGroup("☁", "AI Provider & Endpoint", "Configure cloud AI", expanded == "AI Provider & Endpoint", { expanded = if (expanded == "AI Provider & Endpoint") "" else "AI Provider & Endpoint" }) {
+            Text("Connect any trusted OpenAI-compatible HTTPS endpoint.", color = Color.LightGray, fontSize = 11.sp)
+            OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
+            OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
+            OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
         }
-        Spacer(Modifier.height(12.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("⌂  SMART HOME", color = Cyan, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text("Connect your own Home Assistant instance.", color = Color.LightGray, fontSize = 11.sp)
-                OutlinedTextField(haUrl, onHaUrl, Modifier.fillMaxWidth(), label = { Text("HTTPS base URL") }, singleLine = true)
-                OutlinedTextField(haToken, onHaToken, Modifier.fillMaxWidth(), label = { Text("Long-lived access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
-                OutlinedTextField(haEntity, onHaEntity, Modifier.fillMaxWidth(), label = { Text("Entity ID e.g. light.living_room") }, singleLine = true)
+        SettingsGroup("⌕", "Web Search", "Optional SearXNG connection", expanded == "Web Search", { expanded = if (expanded == "Web Search") "" else "Web Search" }) {
+            Text("Use your own self-hosted search service.", color = Color.LightGray, fontSize = 11.sp)
+            OutlinedTextField(webSearchEndpoint, onWebSearchEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS SearXNG /search URL") }, singleLine = true)
+        }
+        SettingsGroup("⌂", "Smart Home", "Home Assistant connection", expanded == "Smart Home", { expanded = if (expanded == "Smart Home") "" else "Smart Home" }) {
+            Text("Connect your own Home Assistant instance.", color = Color.LightGray, fontSize = 11.sp)
+            OutlinedTextField(haUrl, onHaUrl, Modifier.fillMaxWidth(), label = { Text("HTTPS base URL") }, singleLine = true)
+            OutlinedTextField(haToken, onHaToken, Modifier.fillMaxWidth(), label = { Text("Long-lived access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+            OutlinedTextField(haEntity, onHaEntity, Modifier.fillMaxWidth(), label = { Text("Entity ID e.g. light.living_room") }, singleLine = true)
+        }
+        SettingsGroup("♫", "Voice & Speech", "Speech input and spoken replies", expanded == "Voice & Speech", { expanded = if (expanded == "Voice & Speech") "" else "Voice & Speech" }) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Speak AI replies aloud", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Use Android text-to-speech for assistant responses.", color = Color.LightGray, fontSize = 11.sp)
+                }
+                Switch(checked = speakReplies, onCheckedChange = onSpeakReplies)
             }
+            Text("Speech input uses the speech recognizer available on your Android device. Offline recognition depends on installed language packs.", color = Color.LightGray, fontSize = 11.sp)
+        }
+        SettingsGroup("◈", "Appearance", "Dark navy • cyan • violet", expanded == "Appearance", { expanded = if (expanded == "Appearance") "" else "Appearance" }) {
+            Text("The current AURA interface uses the dark navy theme with cyan and violet accents. Additional selectable themes are not available yet.", color = Color.LightGray, fontSize = 12.sp)
+        }
+        SettingsGroup("⬡", "Privacy & Security", "Encrypted local credentials and memories", expanded == "Privacy & Security", { expanded = if (expanded == "Privacy & Security") "" else "Privacy & Security" }) {
+            Text("Credentials are encrypted with Android Keystore. Memories are encrypted on this device. AI requests are sent to the endpoint you configure.", color = Color.LightGray, fontSize = 12.sp)
+        }
+        SettingsGroup("✣", "Extensions", "Manage optional capabilities", expanded == "Extensions", { expanded = if (expanded == "Extensions") "" else "Extensions" }) {
+            Text("Manage extension permissions from the Extensions tab. The current catalogue does not download or execute third-party code.", color = Color.LightGray, fontSize = 12.sp)
+        }
+        SettingsGroup("ⓘ", "About", "AURA v0.6.0 • AGPL-3.0-only", expanded == "About", { expanded = if (expanded == "About") "" else "About" }) {
+            Text("AURA is a cloud-first, provider-neutral Android AI assistant. You supply and control your own AI endpoint and credentials.", color = Color.LightGray, fontSize = 12.sp)
+            Text("License: AGPL-3.0-only", color = Cyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF142C42)), shape = RoundedCornerShape(18.dp)) {
-            Text("✓  Credentials are encrypted with Android Keystore. Never embed a shared production API key in the APK.", Modifier.padding(14.dp), color = Color(0xFFBDEEFF), fontSize = 11.sp)
+            Text("🔒  Your credentials are encrypted with Android Keystore. Never embed a shared production API key in the APK.", Modifier.padding(14.dp), color = Color(0xFFBDEEFF), fontSize = 11.sp)
         }
-        Spacer(Modifier.height(18.dp))
-        Button(onClick = onSave, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2456D8)), shape = RoundedCornerShape(16.dp)) {
-            Text("Save securely", fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(16.dp))
+        Button(onClick = onSave, modifier = Modifier.fillMaxWidth().height(54.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet), shape = RoundedCornerShape(18.dp)) {
+            Text("Save settings securely", fontWeight = FontWeight.Bold)
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(24.dp))
+    }
+}
+
+@Composable
+private fun SettingsGroup(
+    icon: String, title: String, subtitle: String, expanded: Boolean,
+    onToggle: () -> Unit, content: @Composable ColumnScope.() -> Unit
+) {
+    Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(19.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 9.dp)) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(Modifier.fillMaxWidth().clickable(onClick = onToggle).padding(horizontal = 14.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(icon, color = Cyan, fontSize = 24.sp, modifier = Modifier.width(38.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Text(subtitle, color = Color(0xFF9DB7D8), fontSize = 10.sp)
+                }
+                Text(if (expanded) "⌃" else "›", color = Color(0xFFB9C8EA), fontSize = 22.sp)
+            }
+            if (expanded) {
+                HorizontalDivider(color = Color(0xFF34466B))
+                Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp), content = content)
+            }
+        }
     }
 }
