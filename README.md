@@ -3,20 +3,21 @@
 AURA is an open-source Android personal AI assistant with a cloud-first, mobile-light design. Model weights are served remotely by an OpenAI-compatible endpoint; they are not bundled in the phone app.
 
 ## Current development status
-**Development Batch 2 — usable assistant workflows in progress.** The app now includes a configurable streaming chat client, local conversation history, encrypted endpoint credentials, speech-recognition handoff, text-to-speech, explicit app launch, calendar handoff and confirmed Home Assistant service controls. See [the batch implementation notes](docs/COMPLETE_ASSISTANT_BATCH.md).
+**Development Batch 3 — user-managed memory is in development.** Batch 2 provides configurable streaming chat, local conversation history, encrypted endpoint credentials, speech-recognition handoff, text-to-speech, explicit app launch, calendar handoff and confirmed Home Assistant controls. Batch 3 adds a dedicated memory manager where users explicitly add, edit and delete facts; only those approved facts are added to bounded chat context.
 
-This is not yet a complete production assistant. AURA still needs a managed token broker/hosted endpoint, wake word, dedicated long-term memory manager, image/document understanding, web search, advanced action planner, extension catalogue/runtime, automation engine, broader device integrations and release-grade device/security testing.
+This is not yet a complete production assistant. Remaining work includes a managed token broker/hosted endpoint, wake word, richer voice controls, image/document understanding, web search, advanced action planning, automation engine, extension marketplace/runtime, smart-home discovery and release-grade device/security testing.
 
 ## Cloud AI
-The Android app talks to a user-configured HTTPS OpenAI-compatible `/v1/chat/completions` endpoint. vLLM is the recommended self-hostable inference server; LiteLLM can optionally provide routing and quotas. These projects are open source, but GPU hosting is not automatically free. Community free tiers may be limited or unavailable.
+The Android app talks to a user-configured HTTPS OpenAI-compatible `/v1/chat/completions` endpoint. vLLM is the recommended self-hostable inference server; LiteLLM can optionally provide routing and quotas. These projects are open source, but GPU hosting is not automatically free.
 
 ## Privacy and data usage
 - No LLM weights are downloaded or bundled.
 - Credentials entered in Settings are encrypted with Android Keystore AES-GCM.
-- Conversation history is stored locally and can be cleared.
+- Conversation history and user-approved memory are stored locally; both can be cleared independently.
+- Memory is opt-in: AURA does not automatically save personal facts. Saved memory may be included in cloud prompts and is bounded to 10 facts / 1,600 characters.
 - Recent context and response tokens are bounded.
 - Requests require HTTPS; there is no shared API key in the APK.
-- Speech input is delegated to the installed Android recognizer; AURA does not upload raw microphone recordings to the model endpoint.
+- Speech input is delegated to the installed Android recognizer; offline recognition depends on that recognizer.
 - Smart-home actions require a user confirmation.
 
 ## Build
