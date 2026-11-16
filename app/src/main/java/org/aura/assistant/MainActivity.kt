@@ -114,6 +114,7 @@ private fun AuraApp(activity: MainActivity) {
     var packageName by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var selectedTab by remember { mutableStateOf("home") }
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
     var speakReplies by remember { mutableStateOf(secure.get("speak_replies", "true") == "true") }
     var showHaConfirm by remember { mutableStateOf(false) }
@@ -163,6 +164,7 @@ private fun AuraApp(activity: MainActivity) {
 
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        selectedTab = "chat"
         if (!spoken.isNullOrBlank()) { input = spoken; status = "Speech captured. Review it, then tap Send." }
         else status = "No speech was captured. Try again when ready."
     }
@@ -208,8 +210,14 @@ private fun AuraApp(activity: MainActivity) {
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("✦ AURA", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("YOUR PERSONAL AI", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("∞", color = Cyan, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold)
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("AURA", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Your Smart AI Assistant", color = Color(0xFFB9C8EA), fontSize = 10.sp)
+                        }
+                    }
                 }
                 Surface(color = Color(0xFF1B2850), shape = CircleShape) {
                     IconButton(onClick = { settingsOpen = true }) {
@@ -217,59 +225,54 @@ private fun AuraApp(activity: MainActivity) {
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Card(
-                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
-                shape = RoundedCornerShape(26.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF075B9D), Color(0xFF28206E), Color(0xFF421D72))))) {
-                    Column(Modifier.padding(18.dp)) {
-                        Text("GOOD TO SEE YOU", color = Color(0xFFBDEEFF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                        Spacer(Modifier.height(5.dp))
-                        Text("How can I help today?", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text(status, color = Color(0xFFD5E8FF), fontSize = 11.sp, maxLines = 2)
-                        Spacer(Modifier.height(12.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(
-                                onClick = {
-                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
-                                    }
-                                    status = "Listening… review the transcript before sending."
-                                    try { voiceLauncher.launch(intent) } catch (_: Exception) { status = "Speech recognition is unavailable." }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8D8))
-                            ) {
-                                Icon(Icons.Default.Mic, contentDescription = null)
-                                Spacer(Modifier.width(6.dp))
-                                Text("Talk to AURA")
-                            }
-                            Text("Cloud-first • Private memory", color = Color.White, fontSize = 10.sp)
+            if (selectedTab == "home") {
+                Spacer(Modifier.height(12.dp))
+                AuraMicrophoneHero(
+                    onSpeak = {
+                        selectedTab = "voice"
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
                         }
+                        status = "Listening… review the transcript before sending."
+                        try { voiceLauncher.launch(intent) } catch (_: Exception) {
+                            selectedTab = "home"
+                            status = "Speech recognition is unavailable."
+                        }
+                    },
+                    status = if (status.startsWith("Configure")) "Ready when you are" else status
+                )
+                Spacer(Modifier.height(14.dp))
+                Text("QUICK ACTIONS", color = Color(0xFF9DB7D8), fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AuraQuickTile("Chat with AI", "●") { selectedTab = "chat" }
+                    AuraQuickTile("Smart Home", "⌂") {
+                        selectedTab = "chat"
+                        status = if (haUrl.isBlank()) "Connect Home Assistant in Settings to use smart-home controls." else "Your Home Assistant controls are below."
                     }
                 }
-            }
-            Spacer(Modifier.height(12.dp))
-            Text("QUICK ACCESS", color = Color(0xFF9DB7D8), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-            Spacer(Modifier.height(7.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { input = input }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
-                    Text("✦  AI Chat", color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AuraQuickTile("Open Apps", "▦") { selectedTab = "chat"; status = "Enter an installed app package below to open it." }
+                    AuraQuickTile("Set Reminder", "▦") { showScheduledReminder = true }
                 }
-                Button(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
-                    Text("◆  Memories", color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AuraQuickTile("Search Web", "◎") { selectedTab = "chat"; status = "Enter a query in Chat and use Search web." }
+                    AuraQuickTile("More Actions", "•••") { actionHistory = actionAudit.recent(); actionHistoryOpen = true }
                 }
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showScheduledReminder = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
-                    Text("◷  Automations", color = Color.White)
-                }
-                Button(onClick = { extensionsOpen = true; extensionRefresh++ }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
-                    Text("⬡  Extensions", color = Color.White)
+            } else if (selectedTab == "voice") {
+                Spacer(Modifier.height(18.dp))
+                AuraVoicePanel(onStop = { activity.stopSpeaking(); selectedTab = "chat" })
+            } else {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (selectedTab == "chat") "AURA Chat" else "AURA", color = Color.White,
+                        fontSize = 25.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = { selectedTab = "home" }) { Text("Home", color = Cyan) }
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -460,6 +463,15 @@ private fun AuraApp(activity: MainActivity) {
                     } catch (e: Exception) { status = e.message ?: "Unable to open app." }
                 }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.app-launch") && packageName.isNotBlank()) { Text("Open") }
             }
+            AuraBottomNavigation(selected = selectedTab, onSelect = { tab ->
+                selectedTab = tab
+                when (tab) {
+                    "memories" -> { memoryItems = memoryStore.all(); memoryOpen = true }
+                    "automations" -> showScheduledReminder = true
+                    "extensions" -> { extensionsOpen = true; extensionRefresh++ }
+                }
+            })
+            Spacer(Modifier.height(4.dp))
             if (memoryOpen) {
                 AlertDialog(
                     onDismissRequest = { memoryOpen = false },
