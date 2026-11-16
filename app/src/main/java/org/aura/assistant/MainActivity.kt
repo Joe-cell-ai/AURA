@@ -426,7 +426,13 @@ private fun AuraApp(activity: MainActivity) {
                             },
                             contentPadding = PaddingValues(horizontal = 6.dp)
                         ) { Text("Discover") }
-                        listOf("turn_on", "turn_off", "toggle").forEach { service ->
+                        val availableServices = when (haEntity.substringBefore(".")) {
+                            "light", "switch", "fan" -> listOf("turn_on", "turn_off", "toggle")
+                            "climate" -> listOf("turn_on", "turn_off")
+                            "scene", "script" -> listOf("turn_on")
+                            else -> emptyList()
+                        }
+                        availableServices.forEach { service ->
                             OutlinedButton(
                                 enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
                                 onClick = { pendingHaService = service; showHaConfirm = true },
