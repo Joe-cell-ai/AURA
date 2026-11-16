@@ -125,7 +125,7 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
             .addTag("aura-reminder")
             .build()
         WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-            reminderId, ExistingWorkPolicy.REPLACE, nextRequest
+            reminderId, ExistingWorkPolicy.APPEND_OR_REPLACE, nextRequest
         )
     }
 
