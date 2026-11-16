@@ -27,6 +27,13 @@
 - Add a built-in declarative extension catalogue with per-extension grants; no downloaded code execution.
 - Add unit tests and update architecture/privacy documentation.
 
+## Batch 5 — recurring local automations
+- Add validated one-time, daily and weekly reminder rules.
+- Schedule recurring notifications through WorkManager with explicit user selection.
+- Allow cancelling all pending AURA reminders from the reminder dialog.
+- Add unit tests for rule title validation, recurrence intervals and disabled rules.
+- Keep reminders local; Android may defer background work to satisfy battery and system constraints.
+
 ## Remaining production work
 1. A managed identity/token broker and production hosted open-weight inference endpoint.
 2. OCR and PDF/document extraction, multimodal provider compatibility checks, and image privacy controls.
@@ -34,7 +41,7 @@
 4. Typed action planner with risk tiers, confirmations, action history, cancellation and more device integrations.
 5. Smart-home discovery, device picker and additional local protocols.
 6. Signed third-party extension packages, publisher verification, catalogue updates and revocation.
-7. Rich automation triggers/conditions, editing, cancellation and delivery reliability tests.
+7. Event-driven automation triggers/conditions, rule editing and delivery reliability tests. Recurring time-based reminders are now supported.
 8. Offline speech recognition/TTS selection with explicit language-pack availability.
 9. Instrumented tests on supported Android versions, accessibility, security and performance review.
 10. Release signing, reproducible builds, APK size review, privacy policy and distribution.

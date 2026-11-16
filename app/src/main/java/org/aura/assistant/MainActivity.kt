@@ -44,6 +44,9 @@ import org.aura.assistant.actions.ActionAuditRecord
 import org.aura.assistant.actions.ActionRequest
 import org.aura.assistant.actions.ActionRequestValidator
 import org.aura.assistant.automation.ReminderScheduler
+import org.aura.assistant.automation.AutomationRepeat
+import org.aura.assistant.automation.AutomationRule
+import org.aura.assistant.automation.AutomationRuleValidator
 import org.aura.assistant.extensions.ExtensionCatalog
 import org.aura.assistant.extensions.ExtensionGrantStore
 import org.aura.assistant.ai.ChatMessage
@@ -123,6 +126,7 @@ private fun AuraApp(activity: MainActivity) {
     var extensionRefresh by remember { mutableStateOf(0) }
     var scheduledTitle by remember { mutableStateOf("") }
     var scheduledDelay by remember { mutableStateOf("15") }
+    var recurringRepeat by remember { mutableStateOf(AutomationRepeat.ONCE) }
     var pendingHaService by remember { mutableStateOf("toggle") }
     var memoryOpen by remember { mutableStateOf(false) }
     var memoryEnabled by remember { mutableStateOf(secure.get("memory_enabled", "false") == "true") }
@@ -141,10 +145,17 @@ private fun AuraApp(activity: MainActivity) {
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             try {
-                ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L))
-                ReminderScheduler(context).schedule(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L)
-                actionAudit.record("Scheduled reminder", "Scheduled")
-                status = "Reminder scheduled on this device."
+                if (recurringRepeat == AutomationRepeat.ONCE) {
+                    val delay = scheduledDelay.toLongOrNull() ?: 15L
+                    ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, delay))
+                    ReminderScheduler(context).schedule(scheduledTitle, delay)
+                } else {
+                    val rule = AutomationRuleValidator.validate(AutomationRule(scheduledTitle, recurringRepeat))
+                    ReminderScheduler(context).scheduleRecurring(rule.title, rule.repeat)
+                }
+                actionAudit.record("Reminder", if (recurringRepeat == AutomationRepeat.ONCE) "Scheduled once" else "Scheduled " + recurringRepeat.name.lowercase())
+                status = if (recurringRepeat == AutomationRepeat.ONCE) "Reminder scheduled on this device." else "Recurring reminder scheduled."
+                recurringRepeat = AutomationRepeat.ONCE
                 showScheduledReminder = false
             } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
         } else status = "Notification permission is needed to deliver scheduled reminders."
@@ -557,6 +568,7 @@ private fun AuraApp(activity: MainActivity) {
                     },
                     confirmButton = {
                         TextButton(onClick = {
+                            recurringRepeat = AutomationRepeat.ONCE
                             val delay = scheduledDelay.toLongOrNull()
                             if (delay == null || delay !in 1L..10080L) {
                                 status = "Choose a delay from 1 to 10080 minutes."
@@ -568,14 +580,57 @@ private fun AuraApp(activity: MainActivity) {
                                 try {
                                     ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, delay))
                                     ReminderScheduler(context).schedule(scheduledTitle, delay)
-                                    actionAudit.record("Scheduled reminder", "Scheduled")
+                                    actionAudit.record("Reminder", "Scheduled once")
                                     status = "Reminder scheduled on this device."
                                     showScheduledReminder = false
                                 } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
                             }
                         }) { Text("Schedule") }
                     },
-                    dismissButton = { TextButton(onClick = { showScheduledReminder = false }) { Text("Cancel") } }
+                    dismissButton = {
+                        Column {
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            TextButton(onClick = {
+                                recurringRepeat = AutomationRepeat.DAILY
+                                if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    try {
+                                        val rule = AutomationRuleValidator.validate(AutomationRule(scheduledTitle, AutomationRepeat.DAILY))
+                                        ReminderScheduler(context).scheduleRecurring(rule.title, rule.repeat)
+                                        actionAudit.record("Reminder", "Scheduled daily")
+                                        status = "Daily reminder scheduled."
+                                        recurringRepeat = AutomationRepeat.ONCE
+                                        showScheduledReminder = false
+                                    } catch (e: Exception) { status = e.message ?: "Could not schedule recurring reminder." }
+                                }
+                            }) { Text("Daily") }
+                            TextButton(onClick = {
+                                recurringRepeat = AutomationRepeat.WEEKLY
+                                if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    try {
+                                        val rule = AutomationRuleValidator.validate(AutomationRule(scheduledTitle, AutomationRepeat.WEEKLY))
+                                        ReminderScheduler(context).scheduleRecurring(rule.title, rule.repeat)
+                                        actionAudit.record("Reminder", "Scheduled weekly")
+                                        status = "Weekly reminder scheduled."
+                                        recurringRepeat = AutomationRepeat.ONCE
+                                        showScheduledReminder = false
+                                    } catch (e: Exception) { status = e.message ?: "Could not schedule recurring reminder." }
+                                }
+                            }) { Text("Weekly") }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            TextButton(onClick = {
+                                ReminderScheduler(context).cancelAll()
+                                actionAudit.record("Reminders", "All pending reminders cancelled")
+                                status = "All pending AURA reminders cancelled."
+                            }) { Text("Cancel all") }
+                            TextButton(onClick = { showScheduledReminder = false }) { Text("Close") }
+                            }
+                        }
+                    }
                 )
             }
             if (showReminder) {

@@ -10,6 +10,8 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
@@ -32,8 +34,27 @@ class ReminderScheduler(private val context: Context) {
         return id
     }
 
+    fun scheduleRecurring(title: String, repeat: AutomationRepeat): String {
+        require(repeat == AutomationRepeat.DAILY || repeat == AutomationRepeat.WEEKLY) {
+            "Choose a daily or weekly repeat schedule."
+        }
+        val rule = AutomationRuleValidator.validate(AutomationRule(title, repeat))
+        val id = UUID.randomUUID().toString()
+        val request = PeriodicWorkRequestBuilder<ReminderWorker>(repeat.intervalDays.toLong(), TimeUnit.DAYS)
+            .setInitialDelay(repeat.intervalDays.toLong(), TimeUnit.DAYS)
+            .setInputData(workDataOf("title" to rule.title, "reminder_id" to id))
+            .addTag("aura-reminder")
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(id, ExistingPeriodicWorkPolicy.UPDATE, request)
+        return id
+    }
+
     fun cancel(id: String) {
         WorkManager.getInstance(context).cancelUniqueWork(id)
+    }
+
+    fun cancelAll() {
+        WorkManager.getInstance(context).cancelAllWorkByTag("aura-reminder")
     }
 }
 
