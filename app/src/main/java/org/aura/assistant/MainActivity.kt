@@ -115,7 +115,7 @@ private fun AuraApp(activity: MainActivity) {
     var busy by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
-    var speakReplies by remember { mutableStateOf(true) }
+    var speakReplies by remember { mutableStateOf(secure.get("speak_replies", "true") == "true") }
     var showHaConfirm by remember { mutableStateOf(false) }
     var haDiscoverOpen by remember { mutableStateOf(false) }
     var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
@@ -388,7 +388,7 @@ private fun AuraApp(activity: MainActivity) {
                 OutlinedButton(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }) { Text("Memory") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { speakReplies = !speakReplies }) {
+                OutlinedButton(onClick = { speakReplies = !speakReplies; secure.put("speak_replies", speakReplies.toString()) }) {
                     Text(if (speakReplies) "Voice replies: on" else "Voice replies: off")
                 }
                 OutlinedButton(onClick = { store.clear(); messages.clear(); status = "Local conversation cleared." }) {
