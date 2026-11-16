@@ -39,6 +39,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aura.assistant.actions.AndroidActions
+import org.aura.assistant.actions.ActionAuditStore
+import org.aura.assistant.actions.ActionAuditRecord
+import org.aura.assistant.actions.ActionRequest
+import org.aura.assistant.actions.ActionRequestValidator
 import org.aura.assistant.automation.ReminderScheduler
 import org.aura.assistant.extensions.ExtensionCatalog
 import org.aura.assistant.extensions.ExtensionGrantStore
@@ -92,6 +96,7 @@ private fun AuraApp(activity: MainActivity) {
     val webSearch = remember { WebSearchClient() }
     val ha = remember { HomeAssistantClient() }
     val actions = remember { AndroidActions(context) }
+    val actionAudit = remember { ActionAuditStore(context) }
     val extensionGrants = remember { ExtensionGrantStore(context) }
     val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf<UiMessage>() }
@@ -113,6 +118,8 @@ private fun AuraApp(activity: MainActivity) {
     var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
     var showScheduledReminder by remember { mutableStateOf(false) }
     var extensionsOpen by remember { mutableStateOf(false) }
+    var actionHistoryOpen by remember { mutableStateOf(false) }
+    var actionHistory by remember { mutableStateOf(emptyList<ActionAuditRecord>()) }
     var extensionRefresh by remember { mutableStateOf(0) }
     var scheduledTitle by remember { mutableStateOf("") }
     var scheduledDelay by remember { mutableStateOf("15") }
