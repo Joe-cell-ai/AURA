@@ -588,7 +588,8 @@ private fun AuraApp(activity: MainActivity) {
                         }) { Text("Schedule") }
                     },
                     dismissButton = {
-                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Column {
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                             TextButton(onClick = {
                                 recurringRepeat = AutomationRepeat.DAILY
                                 if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -619,12 +620,15 @@ private fun AuraApp(activity: MainActivity) {
                                     } catch (e: Exception) { status = e.message ?: "Could not schedule recurring reminder." }
                                 }
                             }) { Text("Weekly") }
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                             TextButton(onClick = {
                                 ReminderScheduler(context).cancelAll()
                                 actionAudit.record("Reminders", "All pending reminders cancelled")
                                 status = "All pending AURA reminders cancelled."
                             }) { Text("Cancel all") }
                             TextButton(onClick = { showScheduledReminder = false }) { Text("Close") }
+                            }
                         }
                     }
                 )
