@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +36,8 @@ import kotlinx.coroutines.withContext
 import org.aura.assistant.actions.AndroidActions
 import org.aura.assistant.ai.ChatMessage
 import org.aura.assistant.ai.OpenAiCompatibleClient
+import org.aura.assistant.ai.WebSearchClient
+import org.aura.assistant.ai.SearchResultFormatter
 import org.aura.assistant.data.ConversationStore
 import org.aura.assistant.data.AttachmentReader
 import org.aura.assistant.data.MemoryStore
@@ -77,12 +80,14 @@ private fun AuraApp(activity: MainActivity) {
     val store = remember { ConversationStore(context) }
     val memoryStore = remember { MemoryStore(context, secure) }
     val ai = remember { OpenAiCompatibleClient() }
+    val webSearch = remember { WebSearchClient() }
     val ha = remember { HomeAssistantClient() }
     val actions = remember { AndroidActions(context) }
     val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf<UiMessage>() }
     var input by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf(secure.get("ai_endpoint", "https://YOUR-HOST/v1/chat/completions")) }
+    var webSearchEndpoint by remember { mutableStateOf(secure.get("web_search_endpoint")) }
     var model by remember { mutableStateOf(secure.get("ai_model", "your-model-name")) }
     var apiKey by remember { mutableStateOf(secure.get("ai_key")) }
     var haUrl by remember { mutableStateOf(secure.get("ha_url")) }
@@ -134,11 +139,13 @@ private fun AuraApp(activity: MainActivity) {
     if (settingsOpen) {
         SettingsScreen(
             endpoint, { endpoint = it }, model, { model = it }, apiKey, { apiKey = it },
+            webSearchEndpoint, { webSearchEndpoint = it },
             haUrl, { haUrl = it }, haToken, { haToken = it }, haEntity, { haEntity = it },
             onSave = {
                 secure.put("ai_endpoint", endpoint.trim())
                 secure.put("ai_model", model.trim())
                 secure.put("ai_key", apiKey)
+                secure.put("web_search_endpoint", webSearchEndpoint.trim())
                 secure.put("ha_url", haUrl.trim())
                 secure.put("ha_token", haToken)
                 secure.put("ha_entity", haEntity.trim())
@@ -185,6 +192,25 @@ private fun AuraApp(activity: MainActivity) {
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    enabled = webSearchEndpoint.isNotBlank() && input.isNotBlank() && !busy,
+                    onClick = {
+                        val query = input.trim()
+                        busy = true
+                        status = "Searching the web using your configured SearXNG endpoint…"
+                        scope.launch {
+                            try {
+                                val results = withContext(Dispatchers.IO) { webSearch.search(webSearchEndpoint, query) }
+                                val summary = SearchResultFormatter.format(results)
+                                messages += UiMessage("assistant", "Web search results for: " + query + "\\n\\n" + summary)
+                                store.add("assistant", "Web search results for: " + query + "\\n\\n" + summary)
+                                status = "Web search complete. Verify source pages before relying on results."
+                            } catch (e: Exception) {
+                                status = e.message ?: "Web search failed."
+                            } finally { busy = false }
+                        }
+                    }
+                ) { Text("Search web") }
                 OutlinedButton(onClick = { imagePicker.launch(arrayOf("image/*")) }) { Text("Add image") }
                 OutlinedButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("Add text file") }
                 if (imageUri != null || documentText != null) {
@@ -208,7 +234,7 @@ private fun AuraApp(activity: MainActivity) {
                                 status = "Speech recognition is not available on this device."
                             }
                         }) { Icon(Icons.Default.Mic, contentDescription = "Speak", tint = Cyan) }
-                        IconButton(enabled = !busy && input.isNotBlank(), onClick = {
+                        IconButton(enabled = !busy && (input.isNotBlank() || imageUri != null || documentText != null), onClick = {
                             val prompt = input.trim()
                             val imageToSend = imageUri
                             val documentToSend = documentText
@@ -400,12 +426,13 @@ private fun SettingsScreen(
     endpoint: String, onEndpoint: (String) -> Unit,
     model: String, onModel: (String) -> Unit,
     apiKey: String, onApiKey: (String) -> Unit,
+    webSearchEndpoint: String, onWebSearchEndpoint: (String) -> Unit,
     haUrl: String, onHaUrl: (String) -> Unit,
     haToken: String, onHaToken: (String) -> Unit,
     haEntity: String, onHaEntity: (String) -> Unit,
     onSave: () -> Unit, onBack: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().background(Ink).padding(20.dp)) {
+    Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text("AURA Settings", color = Cyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
         Text("Credentials are encrypted with Android Keystore.", color = Color.LightGray, fontSize = 12.sp)
         Spacer(Modifier.height(14.dp))
@@ -413,6 +440,9 @@ private fun SettingsScreen(
         OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
         OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
         OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+        Spacer(Modifier.height(14.dp))
+        Text("Optional web search • SearXNG", color = Cyan, fontWeight = FontWeight.SemiBold)
+        OutlinedTextField(webSearchEndpoint, onWebSearchEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS SearXNG /search URL") }, singleLine = true)
         Spacer(Modifier.height(16.dp))
         Text("Home Assistant (optional)", color = Cyan, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(haUrl, onHaUrl, Modifier.fillMaxWidth(), label = { Text("HTTPS base URL") }, singleLine = true)
