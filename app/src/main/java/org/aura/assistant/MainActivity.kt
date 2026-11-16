@@ -325,6 +325,9 @@ private fun AuraApp(activity: MainActivity) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { extensionsOpen = true; extensionRefresh++ }) { Text("Extensions") }
                 OutlinedButton(onClick = { actionHistory = actionAudit.recent(); actionHistoryOpen = true }) { Text("Activity") }
+                OutlinedButton(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }) { Text("Memory") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { speakReplies = !speakReplies }) {
                     Text(if (speakReplies) "Voice replies: on" else "Voice replies: off")
                 }
@@ -332,7 +335,6 @@ private fun AuraApp(activity: MainActivity) {
                     Text("Clear chat")
                 }
                 OutlinedButton(onClick = { activity.stopSpeaking() }) { Text("Stop voice") }
-                OutlinedButton(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }) { Text("Memory") }
             }
             Spacer(Modifier.height(8.dp))
             Text("Actions require your tap; AI replies cannot execute device commands.", color = Color.Gray, fontSize = 11.sp)
