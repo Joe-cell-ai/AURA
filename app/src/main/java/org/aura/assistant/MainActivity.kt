@@ -1,14 +1,21 @@
 package org.aura.assistant
 
 import android.content.Intent
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.net.Uri
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,14 +36,27 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.aura.assistant.actions.AndroidActions
+import org.aura.assistant.actions.ActionAuditStore
+import org.aura.assistant.actions.ActionAuditRecord
+import org.aura.assistant.actions.ActionRequest
+import org.aura.assistant.actions.ActionRequestValidator
+import org.aura.assistant.automation.ReminderScheduler
+import org.aura.assistant.extensions.ExtensionCatalog
+import org.aura.assistant.extensions.ExtensionGrantStore
 import org.aura.assistant.ai.ChatMessage
 import org.aura.assistant.ai.OpenAiCompatibleClient
+import org.aura.assistant.ai.WebSearchClient
+import org.aura.assistant.ai.SearchResultFormatter
 import org.aura.assistant.data.ConversationStore
+import org.aura.assistant.data.AttachmentReader
 import org.aura.assistant.data.MemoryStore
 import org.aura.assistant.data.StoredMessage
 import org.aura.assistant.security.SecureSettings
 import org.aura.assistant.smarthome.HomeAssistantClient
+import org.aura.assistant.smarthome.HomeAssistantEntity
 import java.util.Locale
 
 private val Ink = Color(0xFF080D18)
@@ -71,14 +91,18 @@ private fun AuraApp(activity: MainActivity) {
     val context = activity
     val secure = remember { SecureSettings(context) }
     val store = remember { ConversationStore(context) }
-    val memoryStore = remember { MemoryStore(context) }
+    val memoryStore = remember { MemoryStore(context, secure) }
     val ai = remember { OpenAiCompatibleClient() }
+    val webSearch = remember { WebSearchClient() }
     val ha = remember { HomeAssistantClient() }
     val actions = remember { AndroidActions(context) }
+    val actionAudit = remember { ActionAuditStore(context) }
+    val extensionGrants = remember { ExtensionGrantStore(context) }
     val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf<UiMessage>() }
     var input by remember { mutableStateOf("") }
     var endpoint by remember { mutableStateOf(secure.get("ai_endpoint", "https://YOUR-HOST/v1/chat/completions")) }
+    var webSearchEndpoint by remember { mutableStateOf(secure.get("web_search_endpoint")) }
     var model by remember { mutableStateOf(secure.get("ai_model", "your-model-name")) }
     var apiKey by remember { mutableStateOf(secure.get("ai_key")) }
     var haUrl by remember { mutableStateOf(secure.get("ha_url")) }
@@ -90,16 +114,40 @@ private fun AuraApp(activity: MainActivity) {
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
     var speakReplies by remember { mutableStateOf(true) }
     var showHaConfirm by remember { mutableStateOf(false) }
+    var haDiscoverOpen by remember { mutableStateOf(false) }
+    var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
+    var showScheduledReminder by remember { mutableStateOf(false) }
+    var extensionsOpen by remember { mutableStateOf(false) }
+    var actionHistoryOpen by remember { mutableStateOf(false) }
+    var actionHistory by remember { mutableStateOf(emptyList<ActionAuditRecord>()) }
+    var extensionRefresh by remember { mutableStateOf(0) }
+    var scheduledTitle by remember { mutableStateOf("") }
+    var scheduledDelay by remember { mutableStateOf("15") }
     var pendingHaService by remember { mutableStateOf("toggle") }
     var memoryOpen by remember { mutableStateOf(false) }
     var memoryEnabled by remember { mutableStateOf(secure.get("memory_enabled", "false") == "true") }
     var memoryItems by remember { mutableStateOf(memoryStore.all()) }
     var memoryDraft by remember { mutableStateOf("") }
     var editingMemoryId by remember { mutableStateOf<Long?>(null) }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var documentText by remember { mutableStateOf<String?>(null) }
+    var attachmentStatus by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         store.recent().forEach { messages += UiMessage(it.role, it.content) }
         memoryItems = memoryStore.all()
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            try {
+                ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L))
+                ReminderScheduler(context).schedule(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L)
+                actionAudit.record("Scheduled reminder", "Scheduled")
+                status = "Reminder scheduled on this device."
+                showScheduledReminder = false
+            } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
+        } else status = "Notification permission is needed to deliver scheduled reminders."
     }
 
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -108,14 +156,32 @@ private fun AuraApp(activity: MainActivity) {
         else status = "No speech was captured. Try again when ready."
     }
 
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        imageUri = uri
+        attachmentStatus = if (uri == null) "" else "Image selected; it will be compressed before upload."
+    }
+    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            try {
+                documentText = AttachmentReader.documentText(context, uri)
+                attachmentStatus = "Text document attached (maximum 32 KB)."
+            } catch (e: Exception) {
+                documentText = null
+                attachmentStatus = e.message ?: "Could not read document."
+            }
+        }
+    }
+
     if (settingsOpen) {
         SettingsScreen(
             endpoint, { endpoint = it }, model, { model = it }, apiKey, { apiKey = it },
+            webSearchEndpoint, { webSearchEndpoint = it },
             haUrl, { haUrl = it }, haToken, { haToken = it }, haEntity, { haEntity = it },
             onSave = {
                 secure.put("ai_endpoint", endpoint.trim())
                 secure.put("ai_model", model.trim())
                 secure.put("ai_key", apiKey)
+                secure.put("web_search_endpoint", webSearchEndpoint.trim())
                 secure.put("ha_url", haUrl.trim())
                 secure.put("ha_token", haToken)
                 secure.put("ha_entity", haEntity.trim())
@@ -161,6 +227,36 @@ private fun AuraApp(activity: MainActivity) {
                     }
                 }
             }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.web-search") && webSearchEndpoint.isNotBlank() && input.isNotBlank() && !busy,
+                    onClick = {
+                        val query = input.trim()
+                        busy = true
+                        status = "Searching the web using your configured SearXNG endpoint…"
+                        scope.launch {
+                            try {
+                                val results = withContext(Dispatchers.IO) { webSearch.search(webSearchEndpoint, query) }
+                                val summary = SearchResultFormatter.format(results)
+                                val resultText = "Web search results for: " + query + "\\n\\n" + summary
+                                messages += UiMessage("assistant", resultText)
+                                store.add("assistant", resultText)
+                                status = "Web search complete. Verify source pages before relying on results."
+                            } catch (e: Exception) {
+                                status = e.message ?: "Web search failed."
+                            } finally { busy = false }
+                        }
+                    }
+                ) { Text("Search web") }
+                OutlinedButton(onClick = { imagePicker.launch(arrayOf("image/*")) }) { Text("Add image") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("Add text file") }
+                if (imageUri != null || documentText != null) {
+                    TextButton(onClick = { imageUri = null; documentText = null; attachmentStatus = "" }) { Text("Remove") }
+                }
+            }
+            if (attachmentStatus.isNotBlank()) Text(attachmentStatus, color = Color.LightGray, fontSize = 11.sp)
             OutlinedTextField(
                 value = input, onValueChange = { input = it }, modifier = Modifier.fillMaxWidth(),
                 placeholder = { Text("Message AURA…") }, maxLines = 4,
@@ -177,9 +273,14 @@ private fun AuraApp(activity: MainActivity) {
                                 status = "Speech recognition is not available on this device."
                             }
                         }) { Icon(Icons.Default.Mic, contentDescription = "Speak", tint = Cyan) }
-                        IconButton(enabled = !busy && input.isNotBlank(), onClick = {
+                        IconButton(enabled = !busy && (input.isNotBlank() || imageUri != null || documentText != null), onClick = {
                             val prompt = input.trim()
+                            val imageToSend = imageUri
+                            val documentToSend = documentText
                             input = ""
+                            imageUri = null
+                            documentText = null
+                            attachmentStatus = ""
                             messages += UiMessage("user", prompt)
                             store.add("user", prompt)
                             val history = buildList {
@@ -192,7 +293,10 @@ private fun AuraApp(activity: MainActivity) {
                             status = "Connecting to your configured AI endpoint…"
                             scope.launch {
                                 try {
-                                    val answer = ai.stream(endpoint, model, apiKey, history, 512) { delta ->
+                                    val imageData = imageToSend?.let { uri ->
+                                        withContext(Dispatchers.IO) { AttachmentReader.imageDataUrl(context, uri) }
+                                    }
+                                    val answer = ai.stream(endpoint, model, apiKey, history, 512, imageData, documentToSend) { delta ->
                                         // Accumulate streaming text in a single assistant bubble.
                                         if (messages.lastOrNull()?.role == "assistant" && messages.last().content.startsWith("__STREAM__")) {
                                             val previous = messages.removeAt(messages.lastIndex)
@@ -219,6 +323,11 @@ private fun AuraApp(activity: MainActivity) {
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { extensionsOpen = true; extensionRefresh++ }) { Text("Extensions") }
+                OutlinedButton(onClick = { actionHistory = actionAudit.recent(); actionHistoryOpen = true }) { Text("Activity") }
+                OutlinedButton(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }) { Text("Memory") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { speakReplies = !speakReplies }) {
                     Text(if (speakReplies) "Voice replies: on" else "Voice replies: off")
                 }
@@ -226,14 +335,13 @@ private fun AuraApp(activity: MainActivity) {
                     Text("Clear chat")
                 }
                 OutlinedButton(onClick = { activity.stopSpeaking() }) { Text("Stop voice") }
-                OutlinedButton(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }) { Text("Memory") }
             }
             Spacer(Modifier.height(8.dp))
             Text("Actions require your tap; AI replies cannot execute device commands.", color = Color.Gray, fontSize = 11.sp)
             var showReminder by remember { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { showReminder = true }, modifier = Modifier.weight(1f)) { Text("Create reminder") }
-                OutlinedButton(onClick = { settingsOpen = true }, modifier = Modifier.weight(1f)) { Text("Settings") }
+                OutlinedButton(onClick = { showReminder = true }, modifier = Modifier.weight(1f)) { Text("Calendar") }
+                OutlinedButton(onClick = { showScheduledReminder = true }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.reminders"), modifier = Modifier.weight(1f)) { Text("Schedule") }
             }
             Spacer(Modifier.height(8.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(16.dp)) {
@@ -242,9 +350,25 @@ private fun AuraApp(activity: MainActivity) {
                     Text(if (haUrl.isBlank()) "Add your Home Assistant URL and token in Settings." else "Configured entity: $haEntity",
                         color = Color.LightGray, fontSize = 11.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(
+                            enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
+                            onClick = {
+                                scope.launch {
+                                    busy = true
+                                    status = "Discovering Home Assistant devices…"
+                                    try {
+                                        haEntities = ha.listEntities(haUrl, haToken)
+                                        haDiscoverOpen = true
+                                        status = "Found " + haEntities.size + " supported entities."
+                                    } catch (e: Exception) { status = e.message ?: "Device discovery failed." }
+                                    finally { busy = false }
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp)
+                        ) { Text("Discover") }
                         listOf("turn_on", "turn_off", "toggle").forEach { service ->
                             OutlinedButton(
-                                enabled = haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
+                                enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
                                 onClick = { pendingHaService = service; showHaConfirm = true },
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 4.dp)
@@ -263,10 +387,12 @@ private fun AuraApp(activity: MainActivity) {
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     try {
+                        ActionRequestValidator.validate(ActionRequest.LaunchApp(packageName))
                         val opened = actions.launchApp(packageName)
+                        actionAudit.record("Launch app", if (opened) "Opened" else "No launchable app")
                         status = if (opened) "Opened $packageName" else "No launchable app found for that package."
                     } catch (e: Exception) { status = e.message ?: "Unable to open app." }
-                }, enabled = packageName.isNotBlank()) { Text("Open") }
+                }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.app-launch") && packageName.isNotBlank()) { Text("Open") }
             }
             if (memoryOpen) {
                 AlertDialog(
@@ -307,12 +433,44 @@ private fun AuraApp(activity: MainActivity) {
                                     TextButton(onClick = { memoryStore.delete(item.id); memoryItems = memoryStore.all() }) { Text("Delete") }
                                 }
                             }
-                            if (memoryItems.isNotEmpty()) TextButton(onClick = {
-                                memoryStore.clear(); memoryItems = emptyList(); memoryDraft = ""; editingMemoryId = null
-                            }) { Text("Delete all memories") }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(onClick = {
+                                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AURA memory export", memoryStore.exportText()))
+                                    status = "Memory export copied to clipboard."
+                                }, enabled = memoryItems.isNotEmpty()) { Text("Export") }
+                                TextButton(onClick = {
+                                    memoryStore.clear(); memoryItems = emptyList(); memoryDraft = ""; editingMemoryId = null
+                                }, enabled = memoryItems.isNotEmpty()) { Text("Delete all") }
+                            }
                         }
                     },
                     confirmButton = { TextButton(onClick = { memoryOpen = false }) { Text("Done") } }
+                )
+            }
+            if (haDiscoverOpen) {
+                AlertDialog(
+                    onDismissRequest = { haDiscoverOpen = false },
+                    title = { Text("Choose a Home Assistant device") },
+                    text = {
+                        Column {
+                            if (haEntities.isEmpty()) Text("No supported entities were found.")
+                            haEntities.forEach { entity ->
+                                TextButton(onClick = {
+                                    haEntity = entity.entityId
+                                    secure.put("ha_entity", entity.entityId)
+                                    haDiscoverOpen = false
+                                    status = "Selected " + entity.friendlyName
+                                }) {
+                                    Column(Modifier.fillMaxWidth()) {
+                                        Text(entity.friendlyName)
+                                        Text(entity.entityId + " • " + entity.state, fontSize = 10.sp, color = Color.LightGray)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { haDiscoverOpen = false }) { Text("Close") } }
                 )
             }
             if (showHaConfirm) {
@@ -325,12 +483,99 @@ private fun AuraApp(activity: MainActivity) {
                         scope.launch {
                             try {
                                 val domain = haEntity.substringBefore(".")
+                                ActionRequestValidator.validate(ActionRequest.HomeAssistantService(haEntity, domain, pendingHaService))
                                 ha.callService(haUrl, haToken, domain, pendingHaService, haEntity)
+                                actionAudit.record("Home Assistant " + pendingHaService, "Accepted")
                                 status = "Home Assistant accepted $pendingHaService for $haEntity."
                             } catch (e: Exception) { status = e.message ?: "Home Assistant request failed." }
                         }
                     }) { Text("Confirm") } },
                     dismissButton = { TextButton(onClick = { showHaConfirm = false }) { Text("Cancel") } }
+                )
+            }
+            if (actionHistoryOpen) {
+                AlertDialog(
+                    onDismissRequest = { actionHistoryOpen = false },
+                    title = { Text("Action history") },
+                    text = {
+                        Column {
+                            if (actionHistory.isEmpty()) Text("No actions have been recorded.")
+                            actionHistory.take(30).forEach { record ->
+                                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Text(record.action, fontWeight = FontWeight.SemiBold)
+                                    Text(record.outcome + " • " + java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.createdAt)), fontSize = 11.sp, color = Color.LightGray)
+                                }
+                            }
+                            if (actionHistory.isNotEmpty()) TextButton(onClick = {
+                                actionAudit.clear()
+                                actionHistory = emptyList()
+                            }) { Text("Clear history") }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { actionHistoryOpen = false }) { Text("Done") } }
+                )
+            }
+            if (extensionsOpen) {
+                AlertDialog(
+                    onDismissRequest = { extensionsOpen = false },
+                    title = { Text("AURA extension catalogue") },
+                    text = {
+                        Column {
+                            val refresh = extensionRefresh
+                            ExtensionCatalog.entries.forEach { entry ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(entry.manifest.name, fontWeight = FontWeight.SemiBold)
+                                        Text(entry.description, fontSize = 11.sp, color = Color.LightGray)
+                                        Text(entry.manifest.capabilities.joinToString(), fontSize = 10.sp, color = Cyan)
+                                    }
+                                    Checkbox(
+                                        checked = extensionGrants.isGranted(entry.manifest.id),
+                                        onCheckedChange = {
+                                            extensionGrants.setGranted(entry.manifest.id, it)
+                                            extensionRefresh = refresh + 1
+                                        }
+                                    )
+                                }
+                            }
+                            Text("Extensions are declarative only. Enabling a grant does not download or run third-party code.", fontSize = 11.sp, color = Color.LightGray)
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { extensionsOpen = false }) { Text("Done") } }
+                )
+            }
+            if (showScheduledReminder) {
+                AlertDialog(
+                    onDismissRequest = { showScheduledReminder = false },
+                    title = { Text("Schedule a reminder") },
+                    text = {
+                        Column {
+                            OutlinedTextField(scheduledTitle, { scheduledTitle = it }, label = { Text("Reminder title") }, singleLine = true)
+                            OutlinedTextField(scheduledDelay, { scheduledDelay = it.filter(Char::isDigit).take(5) }, label = { Text("Minutes from now (1–10080)") }, singleLine = true)
+                            Text("Runs locally using Android background scheduling. Notifications must be allowed.", color = Color.LightGray, fontSize = 11.sp)
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val delay = scheduledDelay.toLongOrNull()
+                            if (delay == null || delay !in 1L..10080L) {
+                                status = "Choose a delay from 1 to 10080 minutes."
+                            } else if (Build.VERSION.SDK_INT >= 33 &&
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                            ) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                try {
+                                    ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, delay))
+                                    ReminderScheduler(context).schedule(scheduledTitle, delay)
+                                    actionAudit.record("Scheduled reminder", "Scheduled")
+                                    status = "Reminder scheduled on this device."
+                                    showScheduledReminder = false
+                                } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
+                            }
+                        }) { Text("Schedule") }
+                    },
+                    dismissButton = { TextButton(onClick = { showScheduledReminder = false }) { Text("Cancel") } }
                 )
             }
             if (showReminder) {
@@ -340,7 +585,9 @@ private fun AuraApp(activity: MainActivity) {
                     text = { Text("AURA will open your calendar app. You can review and save the event there.") },
                     confirmButton = { TextButton(onClick = {
                         showReminder = false
-                        try { actions.createCalendarReminder("AURA reminder") } catch (_: Exception) { status = "No calendar app is available." }
+                        try { ActionRequestValidator.validate(ActionRequest.CalendarReminder("AURA reminder"))
+                            actions.createCalendarReminder("AURA reminder")
+                            actionAudit.record("Calendar reminder", "Calendar opened") } catch (_: Exception) { status = "No calendar app is available." }
                     }) { Text("Continue") } },
                     dismissButton = { TextButton(onClick = { showReminder = false }) { Text("Cancel") } }
                 )
@@ -354,12 +601,13 @@ private fun SettingsScreen(
     endpoint: String, onEndpoint: (String) -> Unit,
     model: String, onModel: (String) -> Unit,
     apiKey: String, onApiKey: (String) -> Unit,
+    webSearchEndpoint: String, onWebSearchEndpoint: (String) -> Unit,
     haUrl: String, onHaUrl: (String) -> Unit,
     haToken: String, onHaToken: (String) -> Unit,
     haEntity: String, onHaEntity: (String) -> Unit,
     onSave: () -> Unit, onBack: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().background(Ink).padding(20.dp)) {
+    Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(20.dp)) {
         Text("AURA Settings", color = Cyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
         Text("Credentials are encrypted with Android Keystore.", color = Color.LightGray, fontSize = 12.sp)
         Spacer(Modifier.height(14.dp))
@@ -367,6 +615,9 @@ private fun SettingsScreen(
         OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
         OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
         OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+        Spacer(Modifier.height(14.dp))
+        Text("Optional web search • SearXNG", color = Cyan, fontWeight = FontWeight.SemiBold)
+        OutlinedTextField(webSearchEndpoint, onWebSearchEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS SearXNG /search URL") }, singleLine = true)
         Spacer(Modifier.height(16.dp))
         Text("Home Assistant (optional)", color = Cyan, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(haUrl, onHaUrl, Modifier.fillMaxWidth(), label = { Text("HTTPS base URL") }, singleLine = true)

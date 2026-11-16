@@ -1,0 +1,9 @@
+model_list:
+  - model_name: aura-default
+    litellm_params:
+      model: openai/aura-qwen
+      api_base: http://vllm:8000/v1
+      api_key: os.environ/VLLM_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
