@@ -89,6 +89,7 @@ internal fun AuraBottomNavigation(selected: String, onSelect: (String) -> Unit) 
             val items = listOf(
                 Triple("home", "⌂", "Home"),
                 Triple("memories", "◈", "Memories"),
+                Triple("actions", "⚙", "Actions"),
                 Triple("automations", "⚡", "Automations"),
                 Triple("extensions", "✣", "Extensions")
             )
