@@ -307,9 +307,16 @@ private fun AuraApp(activity: MainActivity) {
                                     TextButton(onClick = { memoryStore.delete(item.id); memoryItems = memoryStore.all() }) { Text("Delete") }
                                 }
                             }
-                            if (memoryItems.isNotEmpty()) TextButton(onClick = {
-                                memoryStore.clear(); memoryItems = emptyList(); memoryDraft = ""; editingMemoryId = null
-                            }) { Text("Delete all memories") }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(onClick = {
+                                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("AURA memory export", memoryStore.exportText()))
+                                    status = "Memory export copied to clipboard."
+                                }, enabled = memoryItems.isNotEmpty()) { Text("Export") }
+                                TextButton(onClick = {
+                                    memoryStore.clear(); memoryItems = emptyList(); memoryDraft = ""; editingMemoryId = null
+                                }, enabled = memoryItems.isNotEmpty()) { Text("Delete all") }
+                            }
                         }
                     },
                     confirmButton = { TextButton(onClick = { memoryOpen = false }) { Text("Done") } }
