@@ -24,6 +24,8 @@ class OpenAiCompatibleClient {
         apiKey: String,
         messages: List<ChatMessage>,
         maxTokens: Int,
+        imageDataUrl: String? = null,
+        documentText: String? = null,
         onDelta: suspend (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         require(endpoint.startsWith("https://")) { "Use an HTTPS AI endpoint." }
@@ -33,8 +35,24 @@ class OpenAiCompatibleClient {
             put("stream", true)
             put("max_tokens", maxTokens.coerceIn(64, 2048))
             put("messages", JSONArray().also { array ->
-                messages.takeLast(12).forEach { m ->
-                    array.put(JSONObject().put("role", m.role).put("content", m.content.take(12000)))
+                val selected = messages.takeLast(12)
+                selected.forEachIndexed { index, m ->
+                    val isLastUser = index == selected.lastIndex && m.role == "user"
+                    val content: Any = if (isLastUser && (imageDataUrl != null || !documentText.isNullOrBlank())) {
+                        JSONArray().apply {
+                            put(JSONObject().put("type", "text").put("text", buildString {
+                                append(m.content.take(12000))
+                                if (!documentText.isNullOrBlank()) {
+                                    append("\n\nDocument content (user-selected):\n")
+                                    append(documentText.take(32000))
+                                }
+                            }))
+                            if (imageDataUrl != null) {
+                                put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", imageDataUrl)))
+                            }
+                        }
+                    } else m.content.take(12000)
+                    array.put(JSONObject().put("role", m.role).put("content", content))
                 }
             })
         }
