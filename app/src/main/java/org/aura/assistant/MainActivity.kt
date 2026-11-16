@@ -71,7 +71,7 @@ private fun AuraApp(activity: MainActivity) {
     val context = activity
     val secure = remember { SecureSettings(context) }
     val store = remember { ConversationStore(context) }
-    val memoryStore = remember { MemoryStore(context) }
+    val memoryStore = remember { MemoryStore(context, secure) }
     val ai = remember { OpenAiCompatibleClient() }
     val ha = remember { HomeAssistantClient() }
     val actions = remember { AndroidActions(context) }
