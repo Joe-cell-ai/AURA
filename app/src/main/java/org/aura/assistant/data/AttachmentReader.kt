@@ -46,7 +46,17 @@ object AttachmentReader {
         }
         val bytes = context.contentResolver.openInputStream(uri).use { input ->
             requireNotNull(input) { "Cannot open document." }
-            input.readNBytes(MAX_DOCUMENT_BYTES + 1)
+            val output = ByteArrayOutputStream()
+            val buffer = ByteArray(4096)
+            var total = 0
+            while (true) {
+                val count = input.read(buffer)
+                if (count < 0) break
+                total += count
+                require(total <= MAX_DOCUMENT_BYTES) { "Document exceeds the 32 KB limit." }
+                output.write(buffer, 0, count)
+            }
+            output.toByteArray()
         }
         require(bytes.size <= MAX_DOCUMENT_BYTES) { "Document exceeds the 32 KB limit." }
         return bytes.toString(Charsets.UTF_8).trim().also {
