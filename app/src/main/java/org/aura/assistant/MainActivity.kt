@@ -275,8 +275,9 @@ private fun AuraApp(activity: MainActivity) {
                     TextButton(onClick = { selectedTab = "home" }) { Text("Home", color = Cyan) }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (selectedTab == "chat") {
+                Spacer(Modifier.height(10.dp))
+                LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(messages) { message ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement =
                         if (message.role == "user") Arrangement.End else Arrangement.Start) {
@@ -463,6 +464,7 @@ private fun AuraApp(activity: MainActivity) {
                     } catch (e: Exception) { status = e.message ?: "Unable to open app." }
                 }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.app-launch") && packageName.isNotBlank()) { Text("Open") }
             }
+            }
             AuraBottomNavigation(selected = selectedTab, onSelect = { tab ->
                 selectedTab = tab
                 when (tab) {
@@ -474,7 +476,7 @@ private fun AuraApp(activity: MainActivity) {
             Spacer(Modifier.height(4.dp))
             if (memoryOpen) {
                 AlertDialog(
-                    onDismissRequest = { memoryOpen = false },
+                    onDismissRequest = { memoryOpen = false; selectedTab = "home" },
                     title = { Text("Your memory") },
                     text = {
                         Column(Modifier.fillMaxWidth()) {
@@ -523,7 +525,7 @@ private fun AuraApp(activity: MainActivity) {
                             }
                         }
                     },
-                    confirmButton = { TextButton(onClick = { memoryOpen = false }) { Text("Done") } }
+                    confirmButton = { TextButton(onClick = { memoryOpen = false; selectedTab = "home" }) { Text("Done") } }
                 )
             }
             if (haDiscoverOpen) {
@@ -595,7 +597,7 @@ private fun AuraApp(activity: MainActivity) {
             }
             if (extensionsOpen) {
                 AlertDialog(
-                    onDismissRequest = { extensionsOpen = false },
+                    onDismissRequest = { extensionsOpen = false; selectedTab = "home" },
                     title = { Text("AURA extension catalogue") },
                     text = {
                         Column {
@@ -619,12 +621,12 @@ private fun AuraApp(activity: MainActivity) {
                             Text("Extensions are declarative only. Enabling a grant does not download or run third-party code.", fontSize = 11.sp, color = Color.LightGray)
                         }
                     },
-                    confirmButton = { TextButton(onClick = { extensionsOpen = false }) { Text("Done") } }
+                    confirmButton = { TextButton(onClick = { extensionsOpen = false; selectedTab = "home" }) { Text("Done") } }
                 )
             }
             if (showScheduledReminder) {
                 AlertDialog(
-                    onDismissRequest = { showScheduledReminder = false },
+                    onDismissRequest = { showScheduledReminder = false; selectedTab = "home" },
                     title = { Text("Schedule a reminder") },
                     text = {
                         Column {
@@ -694,7 +696,7 @@ private fun AuraApp(activity: MainActivity) {
                                 actionAudit.record("Reminders", "All pending reminders cancelled")
                                 status = "All pending AURA reminders cancelled."
                             }) { Text("Cancel all") }
-                            TextButton(onClick = { showScheduledReminder = false }) { Text("Close") }
+                            TextButton(onClick = { showScheduledReminder = false; selectedTab = "home" }) { Text("Close") }
                             }
                         }
                     }
