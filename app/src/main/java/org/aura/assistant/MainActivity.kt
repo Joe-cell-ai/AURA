@@ -869,6 +869,7 @@ private fun SettingsScreen(
     onSave: () -> Unit, onBack: () -> Unit
 ) {
     var expanded by remember { mutableStateOf("AI Provider & Endpoint") }
+    var voiceLanguageMenuOpen by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(horizontal = 18.dp, vertical = 14.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack) { Text("‹", color = Cyan, fontSize = 28.sp) }
@@ -916,7 +917,22 @@ private fun SettingsScreen(
                 }
                 Switch(checked = speakReplies, onCheckedChange = onSpeakReplies)
             }
-            Text("Speech input uses the speech recognizer available on your Android device. Offline recognition depends on installed language packs.", color = Color.LightGray, fontSize = 11.sp)
+            Text("Voice language", color = Color.White, fontWeight = FontWeight.SemiBold)
+            Box {
+                TextButton(onClick = { voiceLanguageMenuOpen = true }) {
+                    Text(when (voiceLanguage) {
+                        "hi-IN" -> "Hindi"; "te-IN" -> "Telugu"; "ta-IN" -> "Tamil"
+                        "kn-IN" -> "Kannada"; "bn-IN" -> "Bengali"; "en-IN" -> "English (India)"
+                        else -> "System default"
+                    }, color = Cyan)
+                }
+                DropdownMenu(expanded = voiceLanguageMenuOpen, onDismissRequest = { voiceLanguageMenuOpen = false }) {
+                    listOf("system" to "System default", "en-IN" to "English (India)", "hi-IN" to "Hindi", "te-IN" to "Telugu", "ta-IN" to "Tamil", "kn-IN" to "Kannada", "bn-IN" to "Bengali").forEach { (tag, label) ->
+                        DropdownMenuItem(text = { Text(label) }, onClick = { onVoiceLanguage(tag); voiceLanguageMenuOpen = false })
+                    }
+                }
+            }
+            Text("The selected language is requested from Android speech recognition and used for spoken replies when your installed TTS engine supports it. Availability depends on installed language packs.", color = Color.LightGray, fontSize = 11.sp)
         }
         SettingsGroup("◈", "Appearance", "Dark navy • cyan • violet", expanded == "Appearance", { expanded = if (expanded == "Appearance") "" else "Appearance" }) {
             Text("The current AURA interface uses the dark navy theme with cyan and violet accents. Additional selectable themes are not available yet.", color = Color.LightGray, fontSize = 12.sp)
