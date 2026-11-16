@@ -44,6 +44,9 @@ import org.aura.assistant.actions.ActionAuditRecord
 import org.aura.assistant.actions.ActionRequest
 import org.aura.assistant.actions.ActionRequestValidator
 import org.aura.assistant.automation.ReminderScheduler
+import org.aura.assistant.automation.AutomationRepeat
+import org.aura.assistant.automation.AutomationRule
+import org.aura.assistant.automation.AutomationRuleValidator
 import org.aura.assistant.extensions.ExtensionCatalog
 import org.aura.assistant.extensions.ExtensionGrantStore
 import org.aura.assistant.ai.ChatMessage
