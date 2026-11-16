@@ -711,29 +711,50 @@ private fun SettingsScreen(
     haEntity: String, onHaEntity: (String) -> Unit,
     onSave: () -> Unit, onBack: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(20.dp)) {
-        Text("AURA Settings", color = Cyan, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-        Text("Credentials are encrypted with Android Keystore.", color = Color.LightGray, fontSize = 12.sp)
-        Spacer(Modifier.height(14.dp))
-        Text("AI endpoint", color = Cyan, fontWeight = FontWeight.SemiBold)
-        OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
-        OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
-        OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
-        Spacer(Modifier.height(14.dp))
-        Text("Optional web search • SearXNG", color = Cyan, fontWeight = FontWeight.SemiBold)
-        OutlinedTextField(webSearchEndpoint, onWebSearchEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS SearXNG /search URL") }, singleLine = true)
-        Spacer(Modifier.height(16.dp))
-        Text("Home Assistant (optional)", color = Cyan, fontWeight = FontWeight.SemiBold)
-        OutlinedTextField(haUrl, onHaUrl, Modifier.fillMaxWidth(), label = { Text("HTTPS base URL") }, singleLine = true)
-        OutlinedTextField(haToken, onHaToken, Modifier.fillMaxWidth(), label = { Text("Long-lived access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
-        OutlinedTextField(haEntity, onHaEntity, Modifier.fillMaxWidth(), label = { Text("Entity ID e.g. light.living_room") }, singleLine = true)
-        Spacer(Modifier.height(10.dp))
-        Text("Never put a shared production API key in the APK. Use a trusted token-issuing backend for public deployments.",
-            color = Color.LightGray, fontSize = 12.sp)
-        Spacer(Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Back") }
-            Button(onClick = onSave, modifier = Modifier.weight(1f)) { Text("Save securely") }
+    Column(Modifier.fillMaxSize().background(Ink).verticalScroll(rememberScrollState()).padding(18.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("‹  BACK", color = Cyan, fontWeight = FontWeight.Bold) }
+            Spacer(Modifier.weight(1f))
+            Text("AURA", color = Violet, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 2.sp)
         }
+        Text("Settings", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Personalise your assistant and connected services", color = Color(0xFF9DB7D8), fontSize = 12.sp)
+        Spacer(Modifier.height(18.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("☁  AI PROVIDER", color = Cyan, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("Connect any trusted OpenAI-compatible HTTPS endpoint.", color = Color.LightGray, fontSize = 11.sp)
+                OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
+                OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
+                OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("⌕  WEB SEARCH", color = Cyan, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("Optional self-hosted SearXNG service.", color = Color.LightGray, fontSize = 11.sp)
+                OutlinedTextField(webSearchEndpoint, onWebSearchEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS SearXNG /search URL") }, singleLine = true)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(22.dp)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("⌂  SMART HOME", color = Cyan, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("Connect your own Home Assistant instance.", color = Color.LightGray, fontSize = 11.sp)
+                OutlinedTextField(haUrl, onHaUrl, Modifier.fillMaxWidth(), label = { Text("HTTPS base URL") }, singleLine = true)
+                OutlinedTextField(haToken, onHaToken, Modifier.fillMaxWidth(), label = { Text("Long-lived access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
+                OutlinedTextField(haEntity, onHaEntity, Modifier.fillMaxWidth(), label = { Text("Entity ID e.g. light.living_room") }, singleLine = true)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF142C42)), shape = RoundedCornerShape(18.dp)) {
+            Text("✓  Credentials are encrypted with Android Keystore. Never embed a shared production API key in the APK.", Modifier.padding(14.dp), color = Color(0xFFBDEEFF), fontSize = 11.sp)
+        }
+        Spacer(Modifier.height(18.dp))
+        Button(onClick = onSave, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2456D8)), shape = RoundedCornerShape(16.dp)) {
+            Text("Save securely", fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(12.dp))
     }
 }
