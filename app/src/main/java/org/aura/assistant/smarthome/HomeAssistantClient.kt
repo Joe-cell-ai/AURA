@@ -11,7 +11,7 @@ import org.json.JSONObject
 import org.json.JSONArray
 
 
-data class HomeAssistantEntity(val entityId: String, val friendlyName: String, val state: String)
+data class HomeAssistantEntity(val entityId: String, val friendlyName: String, val state: String)\n\ndata class HomeAssistantConversationResult(val text: String, val conversationId: String?)
 
 object HomeAssistantRequestValidator {
     private val domains = setOf("light", "switch", "fan", "climate", "scene", "script")
