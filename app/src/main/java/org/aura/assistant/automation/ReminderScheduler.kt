@@ -18,6 +18,8 @@ import androidx.work.workDataOf
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import java.util.UUID
+import java.time.DayOfWeek
+import java.time.LocalDateTime
 import java.util.concurrent.TimeUnit
 
 class ReminderScheduler(private val context: Context) {
@@ -42,6 +44,39 @@ class ReminderScheduler(private val context: Context) {
         val id = UUID.randomUUID().toString()
         val request = PeriodicWorkRequestBuilder<ReminderWorker>(repeat.intervalDays.toLong(), TimeUnit.DAYS)
             .setInitialDelay(repeat.intervalDays.toLong(), TimeUnit.DAYS)
+            .setInputData(workDataOf("title" to rule.title, "reminder_id" to id))
+            .addTag("aura-reminder")
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(id, ExistingPeriodicWorkPolicy.UPDATE, request)
+        return id
+    }
+
+    /**
+     * Schedules a daily notification at a local wall-clock time.
+     * WorkManager owns execution and persists the request across process death and reboot.
+     */
+    fun scheduleDailyAt(title: String, hour: Int, minute: Int): String {
+        val rule = AutomationRuleValidator.validate(AutomationRule(title, AutomationRepeat.DAILY))
+        val delay = AutomationSchedule.nextDailyDelayMillis(LocalDateTime.now(), hour, minute)
+        val id = UUID.randomUUID().toString()
+        val request = PeriodicWorkRequestBuilder<ReminderWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+            .setInputData(workDataOf("title" to rule.title, "reminder_id" to id))
+            .addTag("aura-reminder")
+            .build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(id, ExistingPeriodicWorkPolicy.UPDATE, request)
+        return id
+    }
+
+    /**
+     * Schedules a weekly notification on the selected local day and time.
+     */
+    fun scheduleWeeklyAt(title: String, day: DayOfWeek, hour: Int, minute: Int): String {
+        val rule = AutomationRuleValidator.validate(AutomationRule(title, AutomationRepeat.WEEKLY))
+        val delay = AutomationSchedule.nextWeeklyDelayMillis(LocalDateTime.now(), day, hour, minute)
+        val id = UUID.randomUUID().toString()
+        val request = PeriodicWorkRequestBuilder<ReminderWorker>(7, TimeUnit.DAYS)
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
             .setInputData(workDataOf("title" to rule.title, "reminder_id" to id))
             .addTag("aura-reminder")
             .build()
