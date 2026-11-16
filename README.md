@@ -1,25 +1,36 @@
 # AURA
 
-AURA is an open-source Android personal AI assistant with a cloud-first, mobile-light design. Model weights are served remotely by an OpenAI-compatible endpoint; they are not bundled in the phone app.
+AURA is an open-source Android personal AI assistant with a cloud-first, mobile-light design. Model weights are served remotely by an OpenAI-compatible endpoint and are not bundled in the phone app.
 
-## Current development status
-**Development Batch 4 — multimodal input, web search, scheduled reminders and encrypted memory in validation.** The app includes configurable streaming chat, local conversation history, encrypted endpoint credentials, push-to-talk speech recognition, text-to-speech, explicit app launch, calendar handoff, confirmed Home Assistant controls and opt-in user-managed memory (add/edit/delete/export/clear) encrypted with Android Keystore. Memory is not automatically extracted from chats and is only sent with AI prompts when enabled. Batch 4 adds image input, bounded text-document input, optional SearXNG search, local scheduled reminders, Home Assistant device discovery, typed action validation/history and a declarative extension catalogue. Optional self-hosted inference deployment templates are in [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md). See [the batch implementation notes](docs/COMPLETE_ASSISTANT_BATCH.md).
+## Current release line
 
-This is not yet a complete production assistant. AURA still needs a managed token broker/hosted endpoint, wake word, PDF/OCR support, a full typed action planner, smart-home discovery, signed third-party extensions, advanced automation triggers and release-grade device/security testing. The current search integration requires a user-configured HTTPS SearXNG endpoint; no shared search service is bundled.
+**Version 0.6.0 — consolidated assistant reliability and security batch.**
+
+AURA includes configurable OpenAI-compatible chat, encrypted local conversation memory, image and bounded text-document attachments, optional SearXNG search, push-to-talk speech recognition, text-to-speech, local one-time/daily/weekly reminders, explicit app and calendar actions, Home Assistant device discovery and confirmed controls, a declarative extension catalogue, and an action audit history.
+
+The dark navy, cyan, blue and violet interface provides a quick-access dashboard for chat, memories, automations and extensions. Settings include provider, search and Home Assistant connection details. The voice-reply preference is stored in encrypted settings.
 
 ## Cloud AI
-The Android app talks to a user-configured HTTPS OpenAI-compatible `/v1/chat/completions` endpoint. vLLM is the recommended self-hostable inference server; LiteLLM can optionally provide routing and quotas. These projects are open source, but GPU hosting is not automatically free. Community free tiers may be limited or unavailable.
 
-## Privacy and data usage
-- No LLM weights are downloaded or bundled.
-- Credentials entered in Settings are encrypted with Android Keystore AES-GCM.
+The Android app connects to a user-configured HTTPS OpenAI-compatible chat-completions endpoint. vLLM is a recommended self-hosting option; LiteLLM can optionally provide routing and quotas. GPU hosting is separate infrastructure and is not automatically free. See [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md).
+
+## Privacy and safety
+
+- No LLM weights are bundled or downloaded by the app.
+- Provider credentials and user-managed memories are encrypted using Android Keystore-backed encryption.
+- Memory is opt-in; memories are not silently extracted from conversations.
 - Conversation history is stored locally and can be cleared.
-- Recent context and response tokens are bounded.
-- Requests require HTTPS; there is no shared API key in the APK.
-- Speech input is delegated to the installed Android recognizer; AURA does not upload raw microphone recordings to the model endpoint.
-- Smart-home actions require a user confirmation.
+- Speech input is handed to the installed Android speech recognizer; AURA does not send raw microphone recordings to the model endpoint.
+- Smart-home requests require an explicit confirmation and validate HTTPS origin, entity domain and supported service.
+- Extensions are declarative permission grants only; AURA does not execute downloaded extension code.
+- Attachments are bounded: images are resized/compressed and text documents are limited to 32 KB.
+
+## Known limitations
+
+PDF extraction/OCR, always-on wake word, event-driven automation rules, executable third-party extensions, offline model/voice packs and a managed hosted AI account service are not implemented. Daily and weekly reminders use WorkManager, so Android may defer delivery for battery and background limits. Real-device validation and release signing are still required before production distribution.
 
 ## Build
+
 Requirements: JDK 17, Android SDK 35, Android Gradle Plugin 8.10.1 and Gradle 8.11.1.
 
 ```bash
@@ -27,7 +38,8 @@ gradle :app:assembleDebug
 gradle :app:testDebugUnitTest
 ```
 
-APK output: `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions uploads the debug APK as an artifact after a successful CI run.
+APK output: `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions uploads a debug APK artifact after a successful CI run.
 
 ## License
+
 AURA source is AGPL-3.0-only. Third-party dependencies, models and voice assets retain their own licenses. See `LICENSE`, `THIRD_PARTY_NOTICES.md` and `MODEL_LICENSES.md`.

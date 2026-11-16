@@ -1,49 +1,32 @@
-# AURA roadmap
+# AURA roadmap and delivery status
 
-## Batch 1 — merged foundation
-- Android Kotlin/Compose scaffold, cloud-first architecture, AGPL-3.0-only licensing, security baseline and CI.
+## Merged foundation and assistant batches
+- Android Kotlin/Compose application with AGPL-3.0-only licensing and Android CI.
+- Cloud-first OpenAI-compatible chat; model weights are not bundled in the APK.
+- Android Keystore-encrypted provider credentials and AES-GCM encrypted, opt-in user-managed memories.
+- Local conversation history, image input, bounded text/Markdown/CSV/JSON attachments, and configurable SearXNG search.
+- Push-to-talk speech recognition with transcript review, text-to-speech, voice-reply toggle and stop control.
+- Explicit app-launch and calendar handoff actions, typed action validation and bounded audit history.
+- Home Assistant discovery for supported entities with explicit confirmation before device actions.
+- Declarative extension catalogue with per-extension grants; third-party executable code is not downloaded or run.
+- One-time, daily and weekly local reminders through WorkManager.
 
-## Batch 2 — merged assistant foundation
-- HTTPS OpenAI-compatible streaming chat and configurable model endpoint.
-- Android Keystore-encrypted endpoint credentials and local SQLite chat history.
-- Android speech-recognition handoff and text-to-speech.
-- Explicit app-launch and calendar handoff actions.
-- Confirmed Home Assistant service controls.
-- Declarative extension manifest validation.
+## Final consolidated assistant batch — 0.6.0
+- Harden Home Assistant endpoint validation: HTTPS origin only, no embedded credentials, path, query or fragment.
+- Validate entity IDs and ensure requested service domain matches the selected entity.
+- Restrict available service buttons by device domain (light/switch/fan, climate, scene/script).
+- Reject blank or overlong one-time reminder titles instead of silently replacing them.
+- Persist the voice-reply preference in encrypted settings.
+- Add focused unit tests for Home Assistant URL, entity and service validation.
+- Update app version and delivery documentation.
 
-## Batch 3 — merged memory, voice and action safety
-- User-managed memory with add, edit, delete and delete-all.
-- Memory use is opt-in and bounded in prompts.
-- Push-to-talk transcript review and stop-voice control.
-- Package-name validation and bounded calendar reminder titles.
+## Explicitly not claimed as complete
+- **PDF/OCR:** text documents and images are supported; PDF text extraction and OCR are not in this build.
+- **Wake word:** no always-listening background microphone service. Voice remains explicit push-to-talk through Android's recognizer.
+- **Advanced event automation:** one-time/daily/weekly reminders work; event-driven triggers, complex conditions, rule editing and an automation history screen remain future work.
+- **Extension marketplace:** the catalogue is declarative and permission-gated. It does not install or execute downloaded third-party code; signed package distribution and revocation remain future work.
+- **Hosted AI service:** AURA connects to a provider configured by the user. Production hosting, account identity, quotas and shared token brokerage require separately operated infrastructure.
+- **Offline AI and speech packs:** not bundled. Speech recognition availability depends on Android recognizer and installed language packs.
+- **Release/device validation:** CI builds and unit tests are necessary but do not replace testing on physical Android devices, accessibility review, release signing or security assessment.
 
-## Batch 4 — implementation in progress
-- Encrypt memory records with Android Keystore AES-GCM and migrate existing plaintext memory.
-- Export memory through an explicit user action.
-- Add image input with client-side resize/compression and a 1.5 MB upload ceiling.
-- Add bounded text/Markdown/CSV/JSON document input (32 KB); PDF extraction is not included yet.
-- Add optional HTTPS SearXNG web search configured by the user.
-- Add local scheduled reminders through WorkManager and notification permission.
-- Add a built-in declarative extension catalogue with per-extension grants; no downloaded code execution.
-- Add unit tests and update architecture/privacy documentation.
-
-## Batch 5 — recurring local automations
-- Add validated one-time, daily and weekly reminder rules.
-- Schedule recurring notifications through WorkManager with explicit user selection.
-- Allow cancelling all pending AURA reminders from the reminder dialog.
-- Add unit tests for rule title validation, recurrence intervals and disabled rules.
-- Keep reminders local; Android may defer background work to satisfy battery and system constraints.
-
-## Remaining production work
-1. A managed identity/token broker and production hosted open-weight inference endpoint.
-2. OCR and PDF/document extraction, multimodal provider compatibility checks, and image privacy controls.
-3. Wake-word detection only after opt-in foreground-service, battery, privacy and device testing.
-4. Typed action planner with risk tiers, confirmations, action history, cancellation and more device integrations.
-5. Smart-home discovery, device picker and additional local protocols.
-6. Signed third-party extension packages, publisher verification, catalogue updates and revocation.
-7. Event-driven automation triggers/conditions, rule editing and delivery reliability tests. Recurring time-based reminders are now supported.
-8. Offline speech recognition/TTS selection with explicit language-pack availability.
-9. Instrumented tests on supported Android versions, accessibility, security and performance review.
-10. Release signing, reproducible builds, APK size review, privacy policy and distribution.
-
-A feature is not considered production-complete until it has automated tests, a successful Android build and documented device validation. A hosted GPU endpoint is separate infrastructure and must not be represented as free or unlimited.
+A feature is production-complete only after automated tests, a successful Android build and documented device validation. Android WorkManager is battery-aware and may defer reminder delivery; it is not an exact alarm clock.

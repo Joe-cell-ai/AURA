@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 class ReminderScheduler(private val context: Context) {
     fun schedule(title: String, delayMinutes: Long): String {
         require(delayMinutes in 1L..10080L) { "Choose a reminder between 1 minute and 7 days." }
-        val safeTitle = title.trim().take(120).ifBlank { "AURA reminder" }
+        val safeTitle = AutomationRuleValidator.validate(AutomationRule(title, AutomationRepeat.ONCE)).title
         val id = UUID.randomUUID().toString()
         val request = OneTimeWorkRequestBuilder<ReminderWorker>()
             .setInitialDelay(delayMinutes, TimeUnit.MINUTES)

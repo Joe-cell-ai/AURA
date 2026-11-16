@@ -115,7 +115,7 @@ private fun AuraApp(activity: MainActivity) {
     var busy by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
-    var speakReplies by remember { mutableStateOf(true) }
+    var speakReplies by remember { mutableStateOf(secure.get("speak_replies", "true") == "true") }
     var showHaConfirm by remember { mutableStateOf(false) }
     var haDiscoverOpen by remember { mutableStateOf(false) }
     var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
@@ -388,7 +388,7 @@ private fun AuraApp(activity: MainActivity) {
                 OutlinedButton(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }) { Text("Memory") }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { speakReplies = !speakReplies }) {
+                OutlinedButton(onClick = { speakReplies = !speakReplies; secure.put("speak_replies", speakReplies.toString()) }) {
                     Text(if (speakReplies) "Voice replies: on" else "Voice replies: off")
                 }
                 OutlinedButton(onClick = { store.clear(); messages.clear(); status = "Local conversation cleared." }) {
@@ -426,7 +426,13 @@ private fun AuraApp(activity: MainActivity) {
                             },
                             contentPadding = PaddingValues(horizontal = 6.dp)
                         ) { Text("Discover") }
-                        listOf("turn_on", "turn_off", "toggle").forEach { service ->
+                        val availableServices = when (haEntity.substringBefore(".")) {
+                            "light", "switch", "fan" -> listOf("turn_on", "turn_off", "toggle")
+                            "climate" -> listOf("turn_on", "turn_off")
+                            "scene", "script" -> listOf("turn_on")
+                            else -> emptyList()
+                        }
+                        availableServices.forEach { service ->
                             OutlinedButton(
                                 enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
                                 onClick = { pendingHaService = service; showHaConfirm = true },
