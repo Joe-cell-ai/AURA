@@ -13,7 +13,9 @@ class WebSearchClient {
     fun search(endpoint: String, query: String, limit: Int = 5): List<WebSearchResult> {
         require(query.trim().length in 2..300) { "Enter a search query between 2 and 300 characters." }
         val base = endpoint.trim().toHttpUrlOrNull() ?: error("Configure a valid HTTPS SearXNG search URL.")
-        require(base.isHttps) { "Web search requires HTTPS." }
+        require(base.isHttps && base.username.isEmpty() && base.password.isEmpty() && base.fragment == null) {
+            "Web search endpoint must use HTTPS and must not contain embedded credentials or a fragment."
+        }
         val url = base.newBuilder()
             .addQueryParameter("q", query.trim())
             .addQueryParameter("format", "json")
@@ -28,11 +30,17 @@ class WebSearchClient {
                 val title = item.optString("title").take(180)
                 val link = item.optString("url")
                 val snippet = item.optString("content").take(500)
-                if (title.isBlank() || !link.startsWith("https://")) null
+                if (title.isBlank() || !isSafeResultUrl(link)) null
                 else WebSearchResult(title, link, snippet)
             }
         }
     }
+}
+
+internal fun isSafeResultUrl(value: String): Boolean {
+    val url = value.toHttpUrlOrNull() ?: return false
+    return url.isHttps && url.host.isNotBlank() && url.username.isEmpty() &&
+        url.password.isEmpty() && url.fragment == null
 }
 
 object SearchResultFormatter {
