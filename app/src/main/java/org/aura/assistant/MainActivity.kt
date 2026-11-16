@@ -228,19 +228,7 @@ private fun AuraApp(activity: MainActivity) {
             if (selectedTab == "home") {
                 Spacer(Modifier.height(12.dp))
                 AuraMicrophoneHero(
-                    onSpeak = {
-                        selectedTab = "voice"
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
-                        }
-                        status = "Listening… review the transcript before sending."
-                        try { voiceLauncher.launch(intent) } catch (_: Exception) {
-                            selectedTab = "home"
-                            status = "Speech recognition is unavailable."
-                        }
-                    },
+                    onSpeak = { selectedTab = "voice" },
                     status = if (status.startsWith("Configure")) "Ready when you are" else status
                 )
                 Spacer(Modifier.height(14.dp))
@@ -266,7 +254,18 @@ private fun AuraApp(activity: MainActivity) {
                 }
             } else if (selectedTab == "voice") {
                 Spacer(Modifier.height(18.dp))
-                AuraVoicePanel(onStop = { activity.stopSpeaking(); selectedTab = "chat" })
+                AuraVoicePanel(
+                    onStart = {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
+                        }
+                        status = "Listening… review the transcript before sending."
+                        try { voiceLauncher.launch(intent) } catch (_: Exception) { status = "Speech recognition is unavailable." }
+                    },
+                    onStop = { activity.stopSpeaking(); selectedTab = "home" }
+                )
             } else if (selectedTab == "memories") {
                 Spacer(Modifier.height(8.dp))
                 AuraMemoriesPage(
@@ -509,7 +508,7 @@ private fun AuraApp(activity: MainActivity) {
             Spacer(Modifier.height(4.dp))
             if (memoryOpen) {
                 AlertDialog(
-                    onDismissRequest = { memoryOpen = false; selectedTab = "home" },
+                    onDismissRequest = { memoryOpen = false; selectedTab = "memories" },
                     title = { Text("Your memory") },
                     text = {
                         Column(Modifier.fillMaxWidth()) {
@@ -558,7 +557,7 @@ private fun AuraApp(activity: MainActivity) {
                             }
                         }
                     },
-                    confirmButton = { TextButton(onClick = { memoryOpen = false; selectedTab = "home" }) { Text("Done") } }
+                    confirmButton = { TextButton(onClick = { memoryOpen = false; selectedTab = "memories" }) { Text("Done") } }
                 )
             }
             if (haDiscoverOpen) {
