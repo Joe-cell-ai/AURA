@@ -62,6 +62,8 @@ import org.aura.assistant.security.SecureSettings
 import org.aura.assistant.smarthome.HomeAssistantClient
 import org.aura.assistant.smarthome.HomeAssistantEntity
 import java.util.Locale
+import java.time.LocalTime
+import java.time.DayOfWeek
 
 private val Ink = Color(0xFF070D20)
 private val Panel = Color(0xFF111D39)
@@ -140,6 +142,8 @@ private fun AuraApp(activity: MainActivity) {
     var extensionRefresh by remember { mutableStateOf(0) }
     var scheduledTitle by remember { mutableStateOf("") }
     var scheduledDelay by remember { mutableStateOf("15") }
+    var scheduledClockTime by remember { mutableStateOf("09:00") }
+    var scheduledWeekday by remember { mutableStateOf("1") }
     var recurringRepeat by remember { mutableStateOf(AutomationRepeat.ONCE) }
     var pendingHaService by remember { mutableStateOf("toggle") }
     var memoryOpen by remember { mutableStateOf(false) }
@@ -165,7 +169,12 @@ private fun AuraApp(activity: MainActivity) {
                     ReminderScheduler(context).schedule(scheduledTitle, delay)
                 } else {
                     val rule = AutomationRuleValidator.validate(AutomationRule(scheduledTitle, recurringRepeat))
-                    ReminderScheduler(context).scheduleRecurring(rule.title, rule.repeat)
+                    val time = LocalTime.parse(scheduledClockTime)
+                    if (rule.repeat == AutomationRepeat.DAILY) {
+                        ReminderScheduler(context).scheduleDailyAt(rule.title, time.hour, time.minute)
+                    } else {
+                        ReminderScheduler(context).scheduleWeeklyAt(rule.title, DayOfWeek.of(scheduledWeekday.toInt()), time.hour, time.minute)
+                    }
                 }
                 actionAudit.record("Reminder", if (recurringRepeat == AutomationRepeat.ONCE) "Scheduled once" else "Scheduled " + recurringRepeat.name.lowercase())
                 status = if (recurringRepeat == AutomationRepeat.ONCE) "Reminder scheduled on this device." else "Recurring reminder scheduled."
@@ -781,8 +790,10 @@ Protect secrets and personal data. Keep answers clear and appropriately concise.
                     text = {
                         Column {
                             OutlinedTextField(scheduledTitle, { scheduledTitle = it }, label = { Text("Reminder title") }, singleLine = true)
-                            OutlinedTextField(scheduledDelay, { scheduledDelay = it.filter(Char::isDigit).take(5) }, label = { Text("Minutes from now (1–10080)") }, singleLine = true)
-                            Text("Runs locally using Android background scheduling. Notifications must be allowed.", color = Color.LightGray, fontSize = 11.sp)
+                            OutlinedTextField(scheduledDelay, { scheduledDelay = it.filter(Char::isDigit).take(5) }, label = { Text("One-time: minutes from now (1–10080)") }, singleLine = true)
+                            OutlinedTextField(scheduledClockTime, { scheduledClockTime = it.take(5) }, label = { Text("Recurring time (HH:mm, 24-hour)") }, singleLine = true)
+                            OutlinedTextField(scheduledWeekday, { scheduledWeekday = it.filter(Char::isDigit).take(1) }, label = { Text("Weekly day (1=Mon … 7=Sun)") }, singleLine = true)
+                            Text("Daily and weekly automations follow your local clock. Android may delay background notifications to preserve battery.", color = Color.LightGray, fontSize = 11.sp)
                         }
                     },
                     confirmButton = {
@@ -816,7 +827,8 @@ Protect secrets and personal data. Keep answers clear and appropriately concise.
                                 } else {
                                     try {
                                         val rule = AutomationRuleValidator.validate(AutomationRule(scheduledTitle, AutomationRepeat.DAILY))
-                                        ReminderScheduler(context).scheduleRecurring(rule.title, rule.repeat)
+                                        val time = LocalTime.parse(scheduledClockTime)
+                                        ReminderScheduler(context).scheduleDailyAt(rule.title, time.hour, time.minute)
                                         actionAudit.record("Reminder", "Scheduled daily")
                                         status = "Daily reminder scheduled."
                                         recurringRepeat = AutomationRepeat.ONCE
@@ -831,7 +843,10 @@ Protect secrets and personal data. Keep answers clear and appropriately concise.
                                 } else {
                                     try {
                                         val rule = AutomationRuleValidator.validate(AutomationRule(scheduledTitle, AutomationRepeat.WEEKLY))
-                                        ReminderScheduler(context).scheduleRecurring(rule.title, rule.repeat)
+                                        val time = LocalTime.parse(scheduledClockTime)
+                                        val day = scheduledWeekday.toIntOrNull()?.takeIf { it in 1..7 }
+                                            ?: throw IllegalArgumentException("Choose a weekly day from 1 (Monday) to 7 (Sunday).")
+                                        ReminderScheduler(context).scheduleWeeklyAt(rule.title, DayOfWeek.of(day), time.hour, time.minute)
                                         actionAudit.record("Reminder", "Scheduled weekly")
                                         status = "Weekly reminder scheduled."
                                         recurringRepeat = AutomationRepeat.ONCE
