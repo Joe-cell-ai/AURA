@@ -3,6 +3,7 @@ package org.aura.assistant
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -88,6 +89,7 @@ internal fun AuraBottomNavigation(selected: String, onSelect: (String) -> Unit) 
             val items = listOf(
                 Triple("home", "⌂", "Home"),
                 Triple("memories", "◈", "Memories"),
+                Triple("actions", "⚙", "Actions"),
                 Triple("automations", "⚡", "Automations"),
                 Triple("extensions", "✣", "Extensions")
             )
@@ -239,5 +241,56 @@ internal fun ColumnScope.AuraExtensionsPage(
         }
         Spacer(Modifier.weight(1f))
         Text("The current catalogue is declarative: it does not download or execute third-party code.", color = Color(0xFFB7C8E8), fontSize = 11.sp)
+    }
+}
+
+
+@Composable
+internal fun AuraDeviceActionsPage(
+    onDial: (String) -> Unit,
+    onSms: (String, String) -> Unit,
+    onSettings: (org.aura.assistant.actions.SettingsDestination) -> Unit,
+    onHistory: () -> Unit
+) {
+    var phone by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    var sms by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    Column(Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Device actions", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text("AURA opens Android's own apps and settings. You review calls and messages before sending.", color = Color(0xFFB7C8E8), fontSize = 12.sp)
+        Card(colors = CardDefaults.cardColors(containerColor = AuraTile)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Text("Phone & messages", color = Color.White, fontWeight = FontWeight.SemiBold)
+                OutlinedTextField(value = phone, onValueChange = { phone = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Phone number") }, singleLine = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { onDial(phone) }, modifier = Modifier.weight(1f)) { Text("Open dialler") }
+                    OutlinedButton(onClick = { onSms(phone, sms) }, modifier = Modifier.weight(1f)) { Text("Compose SMS") }
+                }
+                OutlinedTextField(value = sms, onValueChange = { sms = it }, modifier = Modifier.fillMaxWidth(), label = { Text("SMS message") }, minLines = 3)
+            }
+        }
+        Card(colors = CardDefaults.cardColors(containerColor = AuraTile)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Android settings", color = Color.White, fontWeight = FontWeight.SemiBold)
+                val destinations = listOf(
+                    "Wi-Fi" to org.aura.assistant.actions.SettingsDestination.WIFI,
+                    "Bluetooth" to org.aura.assistant.actions.SettingsDestination.BLUETOOTH,
+                    "Sound" to org.aura.assistant.actions.SettingsDestination.SOUND,
+                    "Display" to org.aura.assistant.actions.SettingsDestination.DISPLAY,
+                    "Apps" to org.aura.assistant.actions.SettingsDestination.APPLICATIONS,
+                    "Security" to org.aura.assistant.actions.SettingsDestination.SECURITY,
+                    "Location" to org.aura.assistant.actions.SettingsDestination.LOCATION
+                )
+                destinations.chunked(2).forEach { pair ->
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pair.forEach { (label, destination) ->
+                            OutlinedButton(onClick = { onSettings(destination) }, modifier = Modifier.weight(1f)) { Text(label) }
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) { Text("View action history") }
     }
 }

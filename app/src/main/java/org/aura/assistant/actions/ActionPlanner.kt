@@ -59,3 +59,9 @@ object ActionRequestValidator {
         return trimmed.filter { it.isDigit() || it == '+' }
     }
 }
+
+/** Android application IDs are reverse-DNS identifiers, not arbitrary shell commands. */
+object PackageNameValidator {
+    private val segment = Regex("^[A-Za-z][A-Za-z0-9_]*$")
+    fun isValid(value: String): Boolean = value.length in 3..255 && value.split('.').let { it.size >= 2 && it.all(segment::matches) }
+}
