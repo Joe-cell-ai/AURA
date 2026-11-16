@@ -229,8 +229,9 @@ private fun AuraApp(activity: MainActivity) {
                             try {
                                 val results = withContext(Dispatchers.IO) { webSearch.search(webSearchEndpoint, query) }
                                 val summary = SearchResultFormatter.format(results)
-                                messages += UiMessage("assistant", "Web search results for: " + query + "\\n\\n" + summary)
-                                store.add("assistant", "Web search results for: " + query + "\\n\\n" + summary)
+                                val resultText = "Web search results for: " + query + "\\n\\n" + summary
+                                messages += UiMessage("assistant", resultText)
+                                store.add("assistant", resultText)
                                 status = "Web search complete. Verify source pages before relying on results."
                             } catch (e: Exception) {
                                 status = e.message ?: "Web search failed."
@@ -239,6 +240,8 @@ private fun AuraApp(activity: MainActivity) {
                     }
                 ) { Text("Search web") }
                 OutlinedButton(onClick = { imagePicker.launch(arrayOf("image/*")) }) { Text("Add image") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { documentPicker.launch(arrayOf("text/plain", "text/markdown", "text/csv", "application/json")) }) { Text("Add text file") }
                 if (imageUri != null || documentText != null) {
                     TextButton(onClick = { imageUri = null; documentText = null; attachmentStatus = "" }) { Text("Remove") }
