@@ -254,7 +254,7 @@ internal fun AuraDeviceActionsPage(
 ) {
     var phone by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
     var sms by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
-    Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(androidx.compose.foundation.rememberScrollState()),
+    Column(Modifier.fillMaxWidth().verticalScroll(androidx.compose.foundation.rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Device actions", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text("AURA opens Android's own apps and settings. You review calls and messages before sending.", color = Color(0xFFB7C8E8), fontSize = 12.sp)
