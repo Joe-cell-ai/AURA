@@ -3,7 +3,7 @@
 ## Development Batch 1 — merged foundation
 - Android Kotlin/Compose scaffold, cloud-first architecture, licensing, security baseline and CI.
 
-## Development Batch 2 — current consolidated implementation
+## Development Batch 2 — merged cloud assistant foundation
 - HTTPS OpenAI-compatible streaming chat and configurable model endpoint.
 - Keystore-encrypted credentials and local SQLite chat history.
 - Android speech-recognition handoff and text-to-speech.
@@ -11,7 +11,7 @@
 - Confirmed Home Assistant service controls.
 - Declarative extension manifest validation.
 
-## Remaining development
+## Development Batch 3 — memory, voice and safer actions (implementation in progress)\n- Separate local SQLite memory store with explicit add, edit, delete and clear controls.\n- Memory use is opt-in, bounded in prompt size and never silently extracted from conversations.\n- Push-to-talk transcript review before sending and a stop-voice control for TTS.\n- Validate app package identifiers before launching; bound calendar reminder titles.\n- Unit tests for memory text bounds and package identifier validation.\n\n## Remaining development
 1. Managed identity/token broker and a production hosted open-weight inference endpoint.
 2. User-controlled long-term memory with inspect/edit/export/delete and retrieval.
 3. Push-to-talk refinements, interruption, offline STT/TTS selection and wake-word feasibility.
