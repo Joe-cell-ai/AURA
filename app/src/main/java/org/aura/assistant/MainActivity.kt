@@ -324,6 +324,7 @@ private fun AuraApp(activity: MainActivity) {
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { extensionsOpen = true; extensionRefresh++ }) { Text("Extensions") }
+                OutlinedButton(onClick = { actionHistory = actionAudit.recent(); actionHistoryOpen = true }) { Text("Activity") }
                 OutlinedButton(onClick = { speakReplies = !speakReplies }) {
                     Text(if (speakReplies) "Voice replies: on" else "Voice replies: off")
                 }
@@ -488,6 +489,28 @@ private fun AuraApp(activity: MainActivity) {
                         }
                     }) { Text("Confirm") } },
                     dismissButton = { TextButton(onClick = { showHaConfirm = false }) { Text("Cancel") } }
+                )
+            }
+            if (actionHistoryOpen) {
+                AlertDialog(
+                    onDismissRequest = { actionHistoryOpen = false },
+                    title = { Text("Action history") },
+                    text = {
+                        Column {
+                            if (actionHistory.isEmpty()) Text("No actions have been recorded.")
+                            actionHistory.take(30).forEach { record ->
+                                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                    Text(record.action, fontWeight = FontWeight.SemiBold)
+                                    Text(record.outcome + " • " + java.text.DateFormat.getDateTimeInstance().format(java.util.Date(record.createdAt)), fontSize = 11.sp, color = Color.LightGray)
+                                }
+                            }
+                            if (actionHistory.isNotEmpty()) TextButton(onClick = {
+                                actionAudit.clear()
+                                actionHistory = emptyList()
+                            }) { Text("Clear history") }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { actionHistoryOpen = false }) { Text("Done") } }
                 )
             }
             if (extensionsOpen) {
