@@ -31,7 +31,9 @@ class MemoryStore(context: Context) : SQLiteOpenHelper(context, "aura_memory.db"
     fun add(fact: String): Long {
         val clean = fact.trim().take(500)
         require(clean.isNotBlank()) { "Memory cannot be empty." }
-        return writableDatabase.insertOrThrow("memories", null, ContentValues().apply {
+        val db = writableDatabase
+        db.execSQL("DELETE FROM memories WHERE id IN (SELECT id FROM memories ORDER BY updated_at ASC LIMIT MAX((SELECT COUNT(*) FROM memories) - 99, 0))")
+        return db.insertOrThrow("memories", null, ContentValues().apply {
             put("fact", clean)
             put("updated_at", System.currentTimeMillis())
         })
