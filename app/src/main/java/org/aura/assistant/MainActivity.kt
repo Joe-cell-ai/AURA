@@ -85,6 +85,9 @@ private fun AuraApp(activity: MainActivity) {
     var settingsOpen by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
     var speakReplies by remember { mutableStateOf(true) }
+    var packageName by remember { mutableStateOf("") }
+    var showHaConfirm by remember { mutableStateOf(false) }
+    var pendingHaService by remember { mutableStateOf("toggle") }
 
     LaunchedEffect(Unit) {
         store.recent().forEach { messages += UiMessage(it.role, it.content) }
@@ -212,7 +215,58 @@ private fun AuraApp(activity: MainActivity) {
             var showReminder by remember { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { showReminder = true }, modifier = Modifier.weight(1f)) { Text("Create reminder") }
-                OutlinedButton(onClick = { settingsOpen = true }, modifier = Modifier.weight(1f)) { Text("Connect devices") }
+                OutlinedButton(onClick = { settingsOpen = true }, modifier = Modifier.weight(1f)) { Text("Settings") }
+            }
+            Spacer(Modifier.height(8.dp))
+            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                    Text("Smart home • Home Assistant", color = Cyan, fontWeight = FontWeight.SemiBold)
+                    Text(if (haUrl.isBlank()) "Add your Home Assistant URL and token in Settings." else "Configured entity: $haEntity",
+                        color = Color.LightGray, fontSize = 11.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("turn_on", "turn_off", "toggle").forEach { service ->
+                            OutlinedButton(
+                                enabled = haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
+                                onClick = { pendingHaService = service; showHaConfirm = true },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp)
+                            ) { Text(service.replace("_", " "), fontSize = 11.sp) }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = packageName, onValueChange = { packageName = it },
+                    modifier = Modifier.weight(1f), singleLine = true,
+                    label = { Text("App package to open") }, placeholder = { Text("com.example.app") }
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    try {
+                        val opened = actions.launchApp(packageName)
+                        status = if (opened) "Opened $packageName" else "No launchable app found for that package."
+                    } catch (e: Exception) { status = e.message ?: "Unable to open app." }
+                }, enabled = packageName.isNotBlank()) { Text("Open") }
+            }
+            if (showHaConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showHaConfirm = false },
+                    title = { Text("Confirm smart-home action") },
+                    text = { Text("Send $pendingHaService to $haEntity on your configured Home Assistant server?") },
+                    confirmButton = { TextButton(onClick = {
+                        showHaConfirm = false
+                        scope.launch {
+                            try {
+                                val domain = haEntity.substringBefore(".")
+                                ha.callService(haUrl, haToken, domain, pendingHaService, haEntity)
+                                status = "Home Assistant accepted $pendingHaService for $haEntity."
+                            } catch (e: Exception) { status = e.message ?: "Home Assistant request failed." }
+                        }
+                    }) { Text("Confirm") } },
+                    dismissButton = { TextButton(onClick = { showHaConfirm = false }) { Text("Cancel") } }
+                )
             }
             if (showReminder) {
                 AlertDialog(
