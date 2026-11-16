@@ -26,6 +26,14 @@ object HomeAssistantRequestValidator {
         return url.toString().trimEnd('/')
     }
 
+    fun conversationText(value: String): String {
+        val prompt = value.trim()
+        require(prompt.isNotBlank() && prompt.length <= 2000) {
+            "Enter a message up to 2,000 characters."
+        }
+        return prompt
+    }
+
     fun entityId(value: String): String {
         val id = value.trim()
         require(Regex("^[a-z_]+\\.[a-z0-9_]+$").matches(id) && id.substringBefore('.') in domains) {
