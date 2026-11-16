@@ -33,6 +33,8 @@ import org.aura.assistant.actions.AndroidActions
 import org.aura.assistant.ai.ChatMessage
 import org.aura.assistant.ai.OpenAiCompatibleClient
 import org.aura.assistant.data.ConversationStore
+import org.aura.assistant.data.MemoryStore
+import org.aura.assistant.data.MemoryPrompt
 import org.aura.assistant.data.StoredMessage
 import org.aura.assistant.security.SecureSettings
 import org.aura.assistant.smarthome.HomeAssistantClient
@@ -69,6 +71,7 @@ private fun AuraApp(activity: MainActivity) {
     val context = activity
     val secure = remember { SecureSettings(context) }
     val store = remember { ConversationStore(context) }
+    val memoryStore = remember { MemoryStore(context) }
     val ai = remember { OpenAiCompatibleClient() }
     val ha = remember { HomeAssistantClient() }
     val actions = remember { AndroidActions(context) }
@@ -84,6 +87,7 @@ private fun AuraApp(activity: MainActivity) {
     var packageName by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var memoryOpen by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
     var speakReplies by remember { mutableStateOf(true) }
     var showHaConfirm by remember { mutableStateOf(false) }
@@ -96,6 +100,11 @@ private fun AuraApp(activity: MainActivity) {
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (!spoken.isNullOrBlank()) input = spoken
+    }
+
+    if (memoryOpen) {
+        MemoryScreen(memoryStore, onBack = { memoryOpen = false })
+        return
     }
 
     if (settingsOpen) {
@@ -124,6 +133,7 @@ private fun AuraApp(activity: MainActivity) {
                     Text("AURA", color = Cyan, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     Text("Personal AI assistant", color = Color.LightGray, fontSize = 12.sp)
                 }
+                TextButton(onClick = { memoryOpen = true }) { Text("Memory") }
                 TextButton(onClick = { settingsOpen = true }) {
                     Icon(Icons.Default.Settings, contentDescription = null)
                     Text("Settings")
@@ -171,7 +181,10 @@ private fun AuraApp(activity: MainActivity) {
                             input = ""
                             messages += UiMessage("user", prompt)
                             store.add("user", prompt)
-                            val history = store.recent(20).map { ChatMessage(it.role, it.content) }
+                            val history = store.recent(20).map { ChatMessage(it.role, it.content) }.toMutableList()
+                            MemoryPrompt.build(memoryStore.all().map { it.fact })?.let {
+                                history.add(0, ChatMessage("system", it))
+                            }
                             busy = true
                             status = "Connecting to your configured AI endpoint…"
                             scope.launch {
@@ -203,7 +216,8 @@ private fun AuraApp(activity: MainActivity) {
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { speakReplies = !speakReplies }) {
+                OutlinedButton(onClick = { memoryOpen = true }, modifier = Modifier.weight(1f)) { Text("Manage memory") }
+                OutlinedButton(onClick = { speakReplies = !speakReplies }, modifier = Modifier.weight(1f)) {
                     Text(if (speakReplies) "Voice replies: on" else "Voice replies: off")
                 }
                 OutlinedButton(onClick = { store.clear(); messages.clear(); status = "Local conversation cleared." }) {
@@ -315,5 +329,75 @@ private fun SettingsScreen(
             OutlinedButton(onClick = onBack, modifier = Modifier.weight(1f)) { Text("Back") }
             Button(onClick = onSave, modifier = Modifier.weight(1f)) { Text("Save securely") }
         }
+    }
+}
+
+
+@Composable
+private fun MemoryScreen(store: MemoryStore, onBack: () -> Unit) {
+    val entries = remember { mutableStateListOf<org.aura.assistant.data.MemoryEntry>().apply { addAll(store.all()) } }
+    var draft by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxSize().background(Ink).padding(18.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("AURA Memory", color = Cyan, fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            TextButton(onClick = onBack) { Text("Back") }
+        }
+        Text("Only facts you add here are saved. Review, edit or delete them anytime. Memory is stored locally and may be included in cloud chat prompts.",
+            color = Color.LightGray, fontSize = 12.sp)
+        Spacer(Modifier.height(12.dp))
+        OutlinedTextField(
+            value = draft, onValueChange = { draft = it.take(500) },
+            modifier = Modifier.fillMaxWidth(), label = { Text("Add a memory (max 500 characters)") },
+            maxLines = 3
+        )
+        Button(
+            onClick = {
+                if (draft.isNotBlank()) {
+                    store.add(draft)
+                    entries.clear()
+                    entries.addAll(store.all())
+                    draft = ""
+                }
+            },
+            enabled = draft.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
+        ) { Text("Save memory") }
+        Spacer(Modifier.height(12.dp))
+        if (entries.isEmpty()) {
+            Text("No saved memories yet.", color = Color.LightGray)
+        } else {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                items(entries, key = { it.id }) { entry ->
+                    var edited by remember(entry.id, entry.fact) { mutableStateOf(entry.fact) }
+                    Card(colors = CardDefaults.cardColors(containerColor = Panel)) {
+                        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                            OutlinedTextField(
+                                value = edited, onValueChange = { edited = it.take(500) },
+                                modifier = Modifier.fillMaxWidth(), maxLines = 3,
+                                label = { Text("Saved fact") }
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                TextButton(onClick = {
+                                    if (edited.isNotBlank()) {
+                                        store.update(entry.id, edited)
+                                        entries.clear()
+                                        entries.addAll(store.all())
+                                    }
+                                }, enabled = edited.isNotBlank()) { Text("Update") }
+                                TextButton(onClick = {
+                                    store.delete(entry.id)
+                                    entries.removeAll { it.id == entry.id }
+                                }) { Text("Delete") }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = {
+            store.clear()
+            entries.clear()
+        }, enabled = entries.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("Delete all memories") }
     }
 }
