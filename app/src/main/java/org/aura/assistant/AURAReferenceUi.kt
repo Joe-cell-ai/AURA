@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -46,7 +47,7 @@ internal fun AuraMicrophoneHero(onSpeak: () -> Unit, status: String) {
 }
 
 @Composable
-internal fun AuraQuickTile(title: String, symbol: String, onClick: () -> Unit) {
+internal fun RowScope.AuraQuickTile(title: String, symbol: String, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.weight(1f).height(70.dp),
