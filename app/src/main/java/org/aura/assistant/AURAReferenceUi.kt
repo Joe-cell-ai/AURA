@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -111,7 +112,7 @@ internal fun AuraVoicePanel(onStop: () -> Unit) {
 
 
 @Composable
-internal fun AuraMemoriesPage(
+internal fun ColumnScope.AuraMemoriesPage(
     memories: List<MemoryRecord>,
     enabled: Boolean,
     onEnabled: (Boolean) -> Unit,
@@ -167,7 +168,7 @@ internal fun AuraMemoriesPage(
 }
 
 @Composable
-internal fun AuraAutomationsPage(onCreate: () -> Unit, onCancelAll: () -> Unit) {
+internal fun ColumnScope.AuraAutomationsPage(onCreate: () -> Unit, onCancelAll: () -> Unit) {
     Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Automations", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
         Text("Set up smart reminders to save time and stay productive.", color = Color(0xFFB7C8E8), fontSize = 13.sp)
@@ -200,7 +201,7 @@ internal fun AuraAutomationsPage(onCreate: () -> Unit, onCancelAll: () -> Unit) 
 }
 
 @Composable
-internal fun AuraExtensionsPage(
+internal fun ColumnScope.AuraExtensionsPage(
     extensions: List<Triple<String, String, Boolean>>,
     onGrantChange: (String, Boolean) -> Unit
 ) {
