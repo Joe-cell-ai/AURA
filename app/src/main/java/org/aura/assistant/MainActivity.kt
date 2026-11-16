@@ -145,11 +145,13 @@ private fun AuraApp(activity: MainActivity) {
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             try {
-                ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L))
                 if (recurringRepeat == AutomationRepeat.ONCE) {
-                    ReminderScheduler(context).schedule(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L)
+                    val delay = scheduledDelay.toLongOrNull() ?: 15L
+                    ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, delay))
+                    ReminderScheduler(context).schedule(scheduledTitle, delay)
                 } else {
-                    ReminderScheduler(context).scheduleRecurring(scheduledTitle, recurringRepeat)
+                    val rule = AutomationRuleValidator.validate(AutomationRule(scheduledTitle, recurringRepeat))
+                    ReminderScheduler(context).scheduleRecurring(rule.title, rule.repeat)
                 }
                 actionAudit.record("Reminder", if (recurringRepeat == AutomationRepeat.ONCE) "Scheduled once" else "Scheduled " + recurringRepeat.name.lowercase())
                 status = if (recurringRepeat == AutomationRepeat.ONCE) "Reminder scheduled on this device." else "Recurring reminder scheduled."
