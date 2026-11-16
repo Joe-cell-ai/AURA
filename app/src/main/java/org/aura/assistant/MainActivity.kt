@@ -217,7 +217,7 @@ private fun AuraApp(activity: MainActivity) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
-                    enabled = webSearchEndpoint.isNotBlank() && input.isNotBlank() && !busy,
+                    enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.web-search") && webSearchEndpoint.isNotBlank() && input.isNotBlank() && !busy,
                     onClick = {
                         val query = input.trim()
                         busy = true
@@ -323,7 +323,7 @@ private fun AuraApp(activity: MainActivity) {
             var showReminder by remember { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { showReminder = true }, modifier = Modifier.weight(1f)) { Text("Calendar") }
-                OutlinedButton(onClick = { showScheduledReminder = true }, modifier = Modifier.weight(1f)) { Text("Schedule") }
+                OutlinedButton(onClick = { showScheduledReminder = true }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.reminders"), modifier = Modifier.weight(1f)) { Text("Schedule") }
             }
             Spacer(Modifier.height(8.dp))
             Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(16.dp)) {
@@ -334,7 +334,7 @@ private fun AuraApp(activity: MainActivity) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf("turn_on", "turn_off", "toggle").forEach { service ->
                             OutlinedButton(
-                                enabled = haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
+                                enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
                                 onClick = { pendingHaService = service; showHaConfirm = true },
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(horizontal = 4.dp)
@@ -356,7 +356,7 @@ private fun AuraApp(activity: MainActivity) {
                         val opened = actions.launchApp(packageName)
                         status = if (opened) "Opened $packageName" else "No launchable app found for that package."
                     } catch (e: Exception) { status = e.message ?: "Unable to open app." }
-                }, enabled = packageName.isNotBlank()) { Text("Open") }
+                }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.app-launch") && packageName.isNotBlank()) { Text("Open") }
             }
             if (memoryOpen) {
                 AlertDialog(
