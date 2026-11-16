@@ -18,8 +18,6 @@ class MemoryStore(context: Context, private val secure: SecureSettings) :
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
-            db.beginTransaction()
-            try {
                 db.execSQL("CREATE TABLE memories_secure (id INTEGER PRIMARY KEY AUTOINCREMENT, content_enc TEXT NOT NULL, updated_at INTEGER NOT NULL)")
                 db.rawQuery("SELECT id, content, updated_at FROM memories", null).use { cursor ->
                     while (cursor.moveToNext()) {
@@ -33,10 +31,6 @@ class MemoryStore(context: Context, private val secure: SecureSettings) :
                 }
                 db.execSQL("DROP TABLE memories")
                 db.execSQL("ALTER TABLE memories_secure RENAME TO memories")
-                db.setTransactionSuccessful()
-            } finally {
-                db.endTransaction()
-            }
         }
     }
 
