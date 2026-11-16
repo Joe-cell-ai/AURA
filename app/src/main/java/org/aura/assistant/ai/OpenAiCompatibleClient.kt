@@ -24,7 +24,7 @@ class OpenAiCompatibleClient {
         apiKey: String,
         messages: List<ChatMessage>,
         maxTokens: Int,
-        onDelta: (String) -> Unit
+        onDelta: suspend (String) -> Unit
     ): String = withContext(Dispatchers.IO) {
         require(endpoint.startsWith("https://")) { "Use an HTTPS AI endpoint." }
         require(model.isNotBlank()) { "Enter a model name in Settings." }
@@ -60,7 +60,7 @@ class OpenAiCompatibleClient {
                         ?.optString("content").orEmpty()
                     if (delta.isNotEmpty() && delta != "null") {
                         complete.append(delta)
-                        onDelta(delta)
+                        withContext(Dispatchers.Main) { onDelta(delta) }
                     }
                 } catch (_: Exception) {
                     // Ignore non-JSON SSE keepalive/comment frames.
