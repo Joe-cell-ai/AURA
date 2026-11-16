@@ -51,7 +51,6 @@ class ReminderScheduler(private val context: Context) {
 
     fun cancel(id: String) {
         WorkManager.getInstance(context).cancelUniqueWork(id)
-        WorkManager.getInstance(context).cancelUniqueWork(id)
     }
 
     fun cancelAll() {
