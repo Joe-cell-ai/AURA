@@ -3,7 +3,7 @@
 AURA is an open-source Android personal AI assistant with a cloud-first, mobile-light design. Model weights are served remotely by an OpenAI-compatible endpoint; they are not bundled in the phone app.
 
 ## Current development status
-**Development Batch 2 — usable assistant workflows in progress.** The app now includes a configurable streaming chat client, local conversation history, encrypted endpoint credentials, speech-recognition handoff, text-to-speech, explicit app launch, calendar handoff and confirmed Home Assistant service controls. See [the batch implementation notes](docs/COMPLETE_ASSISTANT_BATCH.md).
+**Development Batch 3 — memory, voice and safer actions under validation.** The app includes configurable streaming chat, local conversation history, encrypted endpoint credentials, push-to-talk speech recognition, text-to-speech, explicit app launch, calendar handoff, confirmed Home Assistant controls and opt-in user-managed memory (add/edit/delete/clear). Memory is not automatically extracted from chats and is only sent with AI prompts when enabled. See [the batch implementation notes](docs/COMPLETE_ASSISTANT_BATCH.md).
 
 This is not yet a complete production assistant. AURA still needs a managed token broker/hosted endpoint, wake word, dedicated long-term memory manager, image/document understanding, web search, advanced action planner, extension catalogue/runtime, automation engine, broader device integrations and release-grade device/security testing.
 
