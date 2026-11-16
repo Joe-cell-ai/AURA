@@ -62,10 +62,10 @@ import org.aura.assistant.smarthome.HomeAssistantClient
 import org.aura.assistant.smarthome.HomeAssistantEntity
 import java.util.Locale
 
-private val Ink = Color(0xFF080D18)
-private val Panel = Color(0xFF121C2E)
-private val Cyan = Color(0xFF58D7F5)
-private val Violet = Color(0xFF8A7CFF)
+private val Ink = Color(0xFF070D20)
+private val Panel = Color(0xFF111D39)
+private val Cyan = Color(0xFF31D8F5)
+private val Violet = Color(0xFF9B65FF)
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
@@ -208,19 +208,68 @@ private fun AuraApp(activity: MainActivity) {
         Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("AURA", color = Cyan, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-                    Text("Personal AI assistant", color = Color.LightGray, fontSize = 12.sp)
+                    Text("✦ AURA", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("YOUR PERSONAL AI", color = Cyan, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
                 }
-                TextButton(onClick = { settingsOpen = true }) {
-                    Icon(Icons.Default.Settings, contentDescription = null)
-                    Text("Settings")
+                Surface(color = Color(0xFF1B2850), shape = CircleShape) {
+                    IconButton(onClick = { settingsOpen = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Cyan)
+                    }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Card(colors = CardDefaults.cardColors(containerColor = Panel), shape = RoundedCornerShape(18.dp)) {
-                Column(Modifier.padding(12.dp)) {
-                    Text("Cloud-first • Mobile-light", color = Cyan, fontWeight = FontWeight.SemiBold)
-                    Text(status, color = Color.LightGray, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+                shape = RoundedCornerShape(26.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF075B9D), Color(0xFF28206E), Color(0xFF421D72))))) {
+                    Column(Modifier.padding(18.dp)) {
+                        Text("GOOD TO SEE YOU", color = Color(0xFFBDEEFF), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Spacer(Modifier.height(5.dp))
+                        Text("How can I help today?", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                        Text(status, color = Color(0xFFD5E8FF), fontSize = 11.sp, maxLines = 2)
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                                        putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
+                                    }
+                                    status = "Listening… review the transcript before sending."
+                                    try { voiceLauncher.launch(intent) } catch (_: Exception) { status = "Speech recognition is unavailable." }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00A8D8))
+                            ) {
+                                Icon(Icons.Default.Mic, contentDescription = null)
+                                Spacer(Modifier.width(6.dp))
+                                Text("Talk to AURA")
+                            }
+                            Text("Cloud-first • Private memory", color = Color.White, fontSize = 10.sp)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text("QUICK ACCESS", color = Color(0xFF9DB7D8), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+            Spacer(Modifier.height(7.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { input = input }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
+                    Text("✦  AI Chat", color = Color.White)
+                }
+                Button(onClick = { memoryItems = memoryStore.all(); memoryOpen = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
+                    Text("◆  Memories", color = Color.White)
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { showScheduledReminder = true }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
+                    Text("◷  Automations", color = Color.White)
+                }
+                Button(onClick = { extensionsOpen = true; extensionRefresh++ }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF172B50)), shape = RoundedCornerShape(16.dp)) {
+                    Text("⬡  Extensions", color = Color.White)
                 }
             }
             Spacer(Modifier.height(10.dp))
