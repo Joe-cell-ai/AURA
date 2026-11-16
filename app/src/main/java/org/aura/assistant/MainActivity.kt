@@ -382,7 +382,9 @@ private fun AuraApp(activity: MainActivity) {
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     try {
+                        ActionRequestValidator.validate(ActionRequest.LaunchApp(packageName))
                         val opened = actions.launchApp(packageName)
+                        actionAudit.record("Launch app", if (opened) "Opened" else "No launchable app")
                         status = if (opened) "Opened $packageName" else "No launchable app found for that package."
                     } catch (e: Exception) { status = e.message ?: "Unable to open app." }
                 }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.app-launch") && packageName.isNotBlank()) { Text("Open") }
@@ -476,7 +478,9 @@ private fun AuraApp(activity: MainActivity) {
                         scope.launch {
                             try {
                                 val domain = haEntity.substringBefore(".")
+                                ActionRequestValidator.validate(ActionRequest.HomeAssistantService(haEntity, domain, pendingHaService))
                                 ha.callService(haUrl, haToken, domain, pendingHaService, haEntity)
+                                actionAudit.record("Home Assistant " + pendingHaService, "Accepted")
                                 status = "Home Assistant accepted $pendingHaService for $haEntity."
                             } catch (e: Exception) { status = e.message ?: "Home Assistant request failed." }
                         }
@@ -552,7 +556,9 @@ private fun AuraApp(activity: MainActivity) {
                     text = { Text("AURA will open your calendar app. You can review and save the event there.") },
                     confirmButton = { TextButton(onClick = {
                         showReminder = false
-                        try { actions.createCalendarReminder("AURA reminder") } catch (_: Exception) { status = "No calendar app is available." }
+                        try { ActionRequestValidator.validate(ActionRequest.CalendarReminder("AURA reminder"))
+                            actions.createCalendarReminder("AURA reminder")
+                            actionAudit.record("Calendar reminder", "Calendar opened") } catch (_: Exception) { status = "No calendar app is available." }
                     }) { Text("Continue") } },
                     dismissButton = { TextButton(onClick = { showReminder = false }) { Text("Cancel") } }
                 )
