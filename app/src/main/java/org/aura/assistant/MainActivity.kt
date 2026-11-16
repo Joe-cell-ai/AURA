@@ -52,6 +52,7 @@ import org.aura.assistant.data.MemoryStore
 import org.aura.assistant.data.StoredMessage
 import org.aura.assistant.security.SecureSettings
 import org.aura.assistant.smarthome.HomeAssistantClient
+import org.aura.assistant.smarthome.HomeAssistantEntity
 import java.util.Locale
 
 private val Ink = Color(0xFF080D18)
@@ -108,6 +109,8 @@ private fun AuraApp(activity: MainActivity) {
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
     var speakReplies by remember { mutableStateOf(true) }
     var showHaConfirm by remember { mutableStateOf(false) }
+    var haDiscoverOpen by remember { mutableStateOf(false) }
+    var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
     var showScheduledReminder by remember { mutableStateOf(false) }
     var extensionsOpen by remember { mutableStateOf(false) }
     var extensionRefresh by remember { mutableStateOf(0) }
@@ -332,6 +335,22 @@ private fun AuraApp(activity: MainActivity) {
                     Text(if (haUrl.isBlank()) "Add your Home Assistant URL and token in Settings." else "Configured entity: $haEntity",
                         color = Color.LightGray, fontSize = 11.sp)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        OutlinedButton(
+                            enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
+                            onClick = {
+                                scope.launch {
+                                    busy = true
+                                    status = "Discovering Home Assistant devices…"
+                                    try {
+                                        haEntities = ha.listEntities(haUrl, haToken)
+                                        haDiscoverOpen = true
+                                        status = "Found " + haEntities.size + " supported entities."
+                                    } catch (e: Exception) { status = e.message ?: "Device discovery failed." }
+                                    finally { busy = false }
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 6.dp)
+                        ) { Text("Discover") }
                         listOf("turn_on", "turn_off", "toggle").forEach { service ->
                             OutlinedButton(
                                 enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
@@ -410,6 +429,31 @@ private fun AuraApp(activity: MainActivity) {
                         }
                     },
                     confirmButton = { TextButton(onClick = { memoryOpen = false }) { Text("Done") } }
+                )
+            }
+            if (haDiscoverOpen) {
+                AlertDialog(
+                    onDismissRequest = { haDiscoverOpen = false },
+                    title = { Text("Choose a Home Assistant device") },
+                    text = {
+                        Column {
+                            if (haEntities.isEmpty()) Text("No supported entities were found.")
+                            haEntities.forEach { entity ->
+                                TextButton(onClick = {
+                                    haEntity = entity.entityId
+                                    secure.put("ha_entity", entity.entityId)
+                                    haDiscoverOpen = false
+                                    status = "Selected " + entity.friendlyName
+                                }) {
+                                    Column(Modifier.fillMaxWidth()) {
+                                        Text(entity.friendlyName)
+                                        Text(entity.entityId + " • " + entity.state, fontSize = 10.sp, color = Color.LightGray)
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { haDiscoverOpen = false }) { Text("Close") } }
                 )
             }
             if (showHaConfirm) {
