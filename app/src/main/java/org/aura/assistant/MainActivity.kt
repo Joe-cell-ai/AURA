@@ -123,6 +123,9 @@ private fun AuraApp(activity: MainActivity) {
     var showHaConfirm by remember { mutableStateOf(false) }
     var haDiscoverOpen by remember { mutableStateOf(false) }
     var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
+    var haConversationInput by remember { mutableStateOf("") }
+    var haConversationResult by remember { mutableStateOf("") }
+    var haConversationId by remember { mutableStateOf<String?>(null) }
     var showScheduledReminder by remember { mutableStateOf(false) }
     var showReminder by remember { mutableStateOf(false) }
     var extensionsOpen by remember { mutableStateOf(false) }
@@ -472,6 +475,34 @@ private fun AuraApp(activity: MainActivity) {
                     Text("Smart home • Home Assistant", color = Cyan, fontWeight = FontWeight.SemiBold)
                     Text(if (haUrl.isBlank()) "Add your Home Assistant URL and token in Settings." else "Configured entity: $haEntity",
                         color = Color.LightGray, fontSize = 11.sp)
+                    OutlinedTextField(
+                        value = haConversationInput, onValueChange = { haConversationInput = it.take(2000) },
+                        modifier = Modifier.fillMaxWidth(), label = { Text("Ask your Home Assistant") },
+                        placeholder = { Text("Turn on the living room lights") }, maxLines = 3
+                    )
+                    Button(
+                        enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && haConversationInput.isNotBlank() && !busy,
+                        onClick = {
+                            val prompt = haConversationInput.trim()
+                            scope.launch {
+                                busy = true
+                                haConversationResult = "Sending request to Home Assistant…"
+                                try {
+                                    val result = ha.processConversation(haUrl, haToken, prompt, haConversationId)
+                                    haConversationId = result.conversationId
+                                    haConversationResult = result.text
+                                    haConversationInput = ""
+                                    status = "Home Assistant replied."
+                                } catch (e: Exception) {
+                                    haConversationResult = e.message ?: "Home Assistant conversation failed."
+                                    status = haConversationResult
+                                } finally { busy = false }
+                            }
+                        }, modifier = Modifier.fillMaxWidth()
+                    ) { Text(if (busy) "Working…" else "Ask Home Assistant") }
+                    if (haConversationResult.isNotBlank()) {
+                        Text(haConversationResult, color = Color(0xFFBDEEFF), fontSize = 12.sp)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         OutlinedButton(
                             enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.home-assistant") && haUrl.isNotBlank() && haToken.isNotBlank() && !busy,
