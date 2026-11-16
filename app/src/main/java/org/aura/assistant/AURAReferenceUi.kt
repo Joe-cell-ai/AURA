@@ -3,6 +3,9 @@ package org.aura.assistant
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.ColumnScope
@@ -32,6 +35,20 @@ internal fun AuraMicrophoneHero(onSpeak: () -> Unit, status: String) {
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val cyanWave = Path().apply {
+                moveTo(0f, size.height * 0.70f)
+                cubicTo(size.width * 0.22f, size.height * 0.35f, size.width * 0.34f, size.height * 0.95f, size.width * 0.56f, size.height * 0.60f)
+                cubicTo(size.width * 0.76f, size.height * 0.28f, size.width * 0.84f, size.height * 0.80f, size.width, size.height * 0.42f)
+            }
+            val violetWave = Path().apply {
+                moveTo(0f, size.height * 0.83f)
+                cubicTo(size.width * 0.25f, size.height * 0.55f, size.width * 0.34f, size.height * 0.98f, size.width * 0.58f, size.height * 0.78f)
+                cubicTo(size.width * 0.78f, size.height * 0.54f, size.width * 0.90f, size.height * 0.92f, size.width, size.height * 0.68f)
+            }
+            drawPath(cyanWave, AuraCyan.copy(alpha = 0.34f), style = Stroke(width = 24f))
+            drawPath(violetWave, AuraViolet.copy(alpha = 0.42f), style = Stroke(width = 18f))
+        }
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Your Smart AI Assistant", color = Color(0xFFC4D9FF), fontSize = 12.sp, letterSpacing = 1.2.sp)
             Box(
