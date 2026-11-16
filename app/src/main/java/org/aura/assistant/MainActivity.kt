@@ -83,7 +83,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) tts?.language = Locale.getDefault()
     }
-    fun speak(text: String) { tts?.speak(text.take(3000), TextToSpeech.QUEUE_FLUSH, null, "aura-response") }
+    fun speak(text: String, languageTag: String = Locale.getDefault().toLanguageTag()) {
+        val locale = Locale.forLanguageTag(languageTag)
+        val availability = tts?.isLanguageAvailable(locale) ?: TextToSpeech.LANG_NOT_SUPPORTED
+        if (availability >= TextToSpeech.LANG_AVAILABLE) tts?.language = locale
+        tts?.speak(text.take(3000), TextToSpeech.QUEUE_FLUSH, null, "aura-response")
+    }
     fun stopSpeaking() { tts?.stop() }
     override fun onDestroy() { tts?.stop(); tts?.shutdown(); super.onDestroy() }
 }
@@ -120,6 +125,7 @@ private fun AuraApp(activity: MainActivity) {
     var selectedTab by remember { mutableStateOf("home") }
     var status by remember { mutableStateOf(if (secure.get("ai_endpoint").isBlank() || secure.get("ai_model").isBlank()) "Set up an AI provider in Settings to start chatting." else "AI provider settings loaded.") }
     var speakReplies by remember { mutableStateOf(secure.get("speak_replies", "true") == "true") }
+    var voiceLanguage by remember { mutableStateOf(secure.get("voice_language", "system")) }
     var showHaConfirm by remember { mutableStateOf(false) }
     var haDiscoverOpen by remember { mutableStateOf(false) }
     var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
@@ -199,6 +205,8 @@ private fun AuraApp(activity: MainActivity) {
             haUrl, { haUrl = it }, haToken, { haToken = it }, haEntity, { haEntity = it },
             speakReplies = speakReplies,
             onSpeakReplies = { speakReplies = it; secure.put("speak_replies", it.toString()) },
+            voiceLanguage = voiceLanguage,
+            onVoiceLanguage = { voiceLanguage = it; secure.put("voice_language", it) },
             providerTesting = providerTesting,
             providerTestResult = providerTestResult,
             onTestConnection = {
@@ -286,6 +294,7 @@ private fun AuraApp(activity: MainActivity) {
                     onStart = {
                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            if (voiceLanguage != "system") putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguage)
                             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                             putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
                         }
@@ -420,6 +429,7 @@ private fun AuraApp(activity: MainActivity) {
                         IconButton(onClick = {
                             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                if (voiceLanguage != "system") putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguage)
                                 putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
                                 putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
                             }
@@ -472,7 +482,7 @@ Protect secrets and personal data. Keep answers clear and appropriately concise.
                                     } else messages += UiMessage("assistant", cleaned)
                                     store.add("assistant", cleaned)
                                     status = "Connected • Conversation stored locally."
-                                    if (speakReplies) activity.speak(cleaned)
+                                    if (speakReplies) activity.speak(cleaned, voiceLanguage.takeIf { it != "system" } ?: Locale.getDefault().toLanguageTag())
                                 } catch (e: Exception) {
                                     if (messages.lastOrNull()?.role == "assistant" && messages.last().content.startsWith("__STREAM__")) {
                                         messages.removeAt(messages.lastIndex)
@@ -854,6 +864,7 @@ private fun SettingsScreen(
     haToken: String, onHaToken: (String) -> Unit,
     haEntity: String, onHaEntity: (String) -> Unit,
     speakReplies: Boolean, onSpeakReplies: (Boolean) -> Unit,
+    voiceLanguage: String, onVoiceLanguage: (String) -> Unit,
     providerTesting: Boolean, providerTestResult: String, onTestConnection: () -> Unit,
     onSave: () -> Unit, onBack: () -> Unit
 ) {
