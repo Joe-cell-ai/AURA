@@ -55,16 +55,23 @@ class ReminderScheduler(private val context: Context) {
      * Schedules a daily notification at a local wall-clock time.
      * WorkManager owns execution and persists the request across process death and reboot.
      */
+    /**
+     * Schedules a daily notification at a local wall-clock time. Each run schedules
+     * the next occurrence, so daylight-saving and manual clock changes are respected.
+     */
     fun scheduleDailyAt(title: String, hour: Int, minute: Int): String {
         val rule = AutomationRuleValidator.validate(AutomationRule(title, AutomationRepeat.DAILY))
         val delay = AutomationSchedule.nextDailyDelayMillis(LocalDateTime.now(), hour, minute)
         val id = UUID.randomUUID().toString()
-        val request = PeriodicWorkRequestBuilder<ReminderWorker>(1, TimeUnit.DAYS)
+        val request = OneTimeWorkRequestBuilder<ReminderWorker>()
             .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .setInputData(workDataOf("title" to rule.title, "reminder_id" to id))
+            .setInputData(workDataOf(
+                "title" to rule.title, "reminder_id" to id, "repeat" to "DAILY",
+                "hour" to hour, "minute" to minute
+            ))
             .addTag("aura-reminder")
             .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(id, ExistingPeriodicWorkPolicy.UPDATE, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(id, ExistingWorkPolicy.REPLACE, request)
         return id
     }
 
@@ -75,12 +82,15 @@ class ReminderScheduler(private val context: Context) {
         val rule = AutomationRuleValidator.validate(AutomationRule(title, AutomationRepeat.WEEKLY))
         val delay = AutomationSchedule.nextWeeklyDelayMillis(LocalDateTime.now(), day, hour, minute)
         val id = UUID.randomUUID().toString()
-        val request = PeriodicWorkRequestBuilder<ReminderWorker>(7, TimeUnit.DAYS)
+        val request = OneTimeWorkRequestBuilder<ReminderWorker>()
             .setInitialDelay(delay, TimeUnit.MILLISECONDS)
-            .setInputData(workDataOf("title" to rule.title, "reminder_id" to id))
+            .setInputData(workDataOf(
+                "title" to rule.title, "reminder_id" to id, "repeat" to "WEEKLY",
+                "day" to day.value, "hour" to hour, "minute" to minute
+            ))
             .addTag("aura-reminder")
             .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(id, ExistingPeriodicWorkPolicy.UPDATE, request)
+        WorkManager.getInstance(context).enqueueUniqueWork(id, ExistingWorkPolicy.REPLACE, request)
         return id
     }
 
@@ -94,6 +104,31 @@ class ReminderScheduler(private val context: Context) {
 }
 
 class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    private fun scheduleNextOccurrence(reminderId: String) {
+        val repeat = inputData.getString("repeat") ?: return
+        val title = inputData.getString("title")?.take(120) ?: "AURA reminder"
+        val hour = inputData.getInt("hour", -1)
+        val minute = inputData.getInt("minute", -1)
+        val now = LocalDateTime.now()
+        val delay = when (repeat) {
+            "DAILY" -> AutomationSchedule.nextDailyDelayMillis(now, hour, minute)
+            "WEEKLY" -> {
+                val day = inputData.getInt("day", -1)
+                if (day !in 1..7) return
+                AutomationSchedule.nextWeeklyDelayMillis(now, DayOfWeek.of(day), hour, minute)
+            }
+            else -> return
+        }
+        val nextRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
+            .setInitialDelay(delay, TimeUnit.MILLISECONDS)
+            .setInputData(inputData)
+            .addTag("aura-reminder")
+            .build()
+        WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+            reminderId, ExistingWorkPolicy.REPLACE, nextRequest
+        )
+    }
+
     override suspend fun doWork(): Result {
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -112,10 +147,9 @@ class ReminderWorker(context: Context, params: WorkerParameters) : CoroutineWork
             .setAutoCancel(true)
             .build()
         return try {
-            NotificationManagerCompat.from(applicationContext).notify(
-                inputData.getString("reminder_id")?.hashCode() ?: System.currentTimeMillis().toInt(),
-                notification
-            )
+            val reminderId = inputData.getString("reminder_id") ?: UUID.randomUUID().toString()
+            NotificationManagerCompat.from(applicationContext).notify(reminderId.hashCode(), notification)
+            scheduleNextOccurrence(reminderId)
             Result.success()
         } catch (_: SecurityException) {
             Result.failure()
