@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import org.aura.assistant.data.MemoryRecord
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,5 +106,119 @@ internal fun AuraVoicePanel(onStop: () -> Unit) {
                 Text("■  Stop", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+
+@Composable
+internal fun AuraMemoriesPage(
+    memories: List<MemoryRecord>,
+    enabled: Boolean,
+    onEnabled: (Boolean) -> Unit,
+    onAdd: () -> Unit,
+    onEdit: (MemoryRecord) -> Unit,
+    onDelete: (Long) -> Unit,
+    onExport: () -> Unit,
+    onDeleteAll: () -> Unit
+) {
+    Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Memories", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                Text("Your personal memories help AURA provide more relevant answers.", color = Color(0xFFB7C8E8), fontSize = 12.sp)
+            }
+            TextButton(onClick = onAdd) { Text("+", color = AuraCyan, fontSize = 26.sp) }
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Use approved memories in AI chats", color = Color.White, modifier = Modifier.weight(1f), fontSize = 12.sp)
+            Switch(checked = enabled, onCheckedChange = onEnabled)
+        }
+        if (memories.isEmpty()) {
+            Surface(color = AuraTile, shape = RoundedCornerShape(18.dp)) {
+                Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("No saved memories yet", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Add only the details you want AURA to remember.", color = Color(0xFFB7C8E8), fontSize = 12.sp)
+                }
+            }
+        } else {
+            memories.forEachIndexed { index, item ->
+                Surface(color = AuraTile, shape = RoundedCornerShape(16.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(listOf("⌂", "▣", "♡", "✈")[index % 4], color = AuraCyan, fontSize = 22.sp)
+                        Spacer(Modifier.width(10.dp))
+                        Text(item.content, color = Color.White, modifier = Modifier.weight(1f), fontSize = 13.sp)
+                        TextButton(onClick = { onEdit(item) }) { Text("Edit") }
+                        TextButton(onClick = { onDelete(item.id) }) { Text("×", color = Color(0xFFFF8A9A)) }
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Surface(color = Color(0xFF102D49), shape = RoundedCornerShape(18.dp)) {
+            Text("🔒  Memories are encrypted and stored securely on your device.", color = Color(0xFFC6EFFF),
+                modifier = Modifier.fillMaxWidth().padding(16.dp), fontSize = 12.sp)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            TextButton(onClick = onExport, enabled = memories.isNotEmpty()) { Text("Export") }
+            TextButton(onClick = onDeleteAll, enabled = memories.isNotEmpty()) { Text("Delete all") }
+            Button(onClick = onAdd, colors = ButtonDefaults.buttonColors(containerColor = AuraViolet)) { Text("+ Add Memory") }
+        }
+    }
+}
+
+@Composable
+internal fun AuraAutomationsPage(onCreate: () -> Unit, onCancelAll: () -> Unit) {
+    Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Automations", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Text("Set up smart reminders to save time and stay productive.", color = Color(0xFFB7C8E8), fontSize = 13.sp)
+        listOf(
+            Triple("One-time reminder", "Schedule a notification on this device", "◷"),
+            Triple("Daily reminder", "Repeat every day using Android background work", "▦"),
+            Triple("Weekly reminder", "Repeat every week using Android background work", "♧")
+        ).forEach { (title, description, symbol) ->
+            Surface(color = AuraTile, shape = RoundedCornerShape(18.dp), onClick = onCreate) {
+                Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(symbol, color = AuraCyan, fontSize = 26.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(title, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(description, color = Color(0xFFB7C8E8), fontSize = 11.sp)
+                    }
+                    Text("›", color = AuraCyan, fontSize = 25.sp)
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Button(onClick = onCreate, modifier = Modifier.fillMaxWidth().height(54.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = AuraViolet), shape = RoundedCornerShape(26.dp)) {
+            Text("+  Add Automation", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        TextButton(onClick = onCancelAll, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+            Text("Cancel all pending reminders", color = Color(0xFFFFA3B0))
+        }
+    }
+}
+
+@Composable
+internal fun AuraExtensionsPage(
+    extensions: List<Triple<String, String, Boolean>>,
+    onGrantChange: (String, Boolean) -> Unit
+) {
+    Column(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Extensions", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+        Text("Manage optional AURA capabilities. Each permission is controlled by you.", color = Color(0xFFB7C8E8), fontSize = 13.sp)
+        extensions.forEach { (name, description, granted) ->
+            Surface(color = AuraTile, shape = RoundedCornerShape(18.dp)) {
+                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(name, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(description, color = Color(0xFFB7C8E8), fontSize = 11.sp)
+                    }
+                    Switch(checked = granted, onCheckedChange = { onGrantChange(name, it) })
+                }
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        Text("The current catalogue is declarative: it does not download or execute third-party code.", color = Color(0xFFB7C8E8), fontSize = 11.sp)
     }
 }
