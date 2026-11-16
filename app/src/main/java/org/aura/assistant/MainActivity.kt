@@ -141,7 +141,9 @@ private fun AuraApp(activity: MainActivity) {
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
             try {
+                ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L))
                 ReminderScheduler(context).schedule(scheduledTitle, scheduledDelay.toLongOrNull() ?: 15L)
+                actionAudit.record("Scheduled reminder", "Scheduled")
                 status = "Reminder scheduled on this device."
                 showScheduledReminder = false
             } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
@@ -539,7 +541,9 @@ private fun AuraApp(activity: MainActivity) {
                                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             } else {
                                 try {
+                                    ActionRequestValidator.validate(ActionRequest.ScheduledReminder(scheduledTitle, delay))
                                     ReminderScheduler(context).schedule(scheduledTitle, delay)
+                                    actionAudit.record("Scheduled reminder", "Scheduled")
                                     status = "Reminder scheduled on this device."
                                     showScheduledReminder = false
                                 } catch (e: Exception) { status = e.message ?: "Could not schedule reminder." }
