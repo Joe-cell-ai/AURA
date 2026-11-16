@@ -40,6 +40,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.aura.assistant.actions.AndroidActions
 import org.aura.assistant.automation.ReminderScheduler
+import org.aura.assistant.extensions.ExtensionCatalog
+import org.aura.assistant.extensions.ExtensionGrantStore
 import org.aura.assistant.ai.ChatMessage
 import org.aura.assistant.ai.OpenAiCompatibleClient
 import org.aura.assistant.ai.WebSearchClient
@@ -89,6 +91,7 @@ private fun AuraApp(activity: MainActivity) {
     val webSearch = remember { WebSearchClient() }
     val ha = remember { HomeAssistantClient() }
     val actions = remember { AndroidActions(context) }
+    val extensionGrants = remember { ExtensionGrantStore(context) }
     val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf<UiMessage>() }
     var input by remember { mutableStateOf("") }
@@ -106,6 +109,8 @@ private fun AuraApp(activity: MainActivity) {
     var speakReplies by remember { mutableStateOf(true) }
     var showHaConfirm by remember { mutableStateOf(false) }
     var showScheduledReminder by remember { mutableStateOf(false) }
+    var extensionsOpen by remember { mutableStateOf(false) }
+    var extensionRefresh by remember { mutableStateOf(0) }
     var scheduledTitle by remember { mutableStateOf("") }
     var scheduledDelay by remember { mutableStateOf("15") }
     var pendingHaService by remember { mutableStateOf("toggle") }
@@ -303,6 +308,7 @@ private fun AuraApp(activity: MainActivity) {
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { extensionsOpen = true; extensionRefresh++ }) { Text("Extensions") }
                 OutlinedButton(onClick = { speakReplies = !speakReplies }) {
                     Text(if (speakReplies) "Voice replies: on" else "Voice replies: off")
                 }
@@ -422,6 +428,35 @@ private fun AuraApp(activity: MainActivity) {
                         }
                     }) { Text("Confirm") } },
                     dismissButton = { TextButton(onClick = { showHaConfirm = false }) { Text("Cancel") } }
+                )
+            }
+            if (extensionsOpen) {
+                AlertDialog(
+                    onDismissRequest = { extensionsOpen = false },
+                    title = { Text("AURA extension catalogue") },
+                    text = {
+                        Column {
+                            val refresh = extensionRefresh
+                            ExtensionCatalog.entries.forEach { entry ->
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(entry.manifest.name, fontWeight = FontWeight.SemiBold)
+                                        Text(entry.description, fontSize = 11.sp, color = Color.LightGray)
+                                        Text(entry.manifest.capabilities.joinToString(), fontSize = 10.sp, color = Cyan)
+                                    }
+                                    Checkbox(
+                                        checked = extensionGrants.isGranted(entry.manifest.id),
+                                        onCheckedChange = {
+                                            extensionGrants.setGranted(entry.manifest.id, it)
+                                            extensionRefresh = refresh + 1
+                                        }
+                                    )
+                                }
+                            }
+                            Text("Extensions are declarative only. Enabling a grant does not download or run third-party code.", fontSize = 11.sp, color = Color.LightGray)
+                        }
+                    },
+                    confirmButton = { TextButton(onClick = { extensionsOpen = false }) { Text("Done") } }
                 )
             }
             if (showScheduledReminder) {
