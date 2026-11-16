@@ -294,6 +294,34 @@ private fun AuraApp(activity: MainActivity) {
                     },
                     onStop = { activity.stopSpeaking(); selectedTab = "home" }
                 )
+            } else if (selectedTab == "actions") {
+                Spacer(Modifier.height(8.dp))
+                AuraDeviceActionsPage(
+                    onDial = { number ->
+                        try {
+                            ActionRequestValidator.validate(ActionRequest.DialNumber(number))
+                            actions.openDialler(number)
+                            actionAudit.record("Open dialler", "Dialler opened; user controls the call")
+                            status = "Dialler opened. Review the number before calling."
+                        } catch (e: Exception) { status = e.message ?: "Could not open dialler." }
+                    },
+                    onSms = { number, message ->
+                        try {
+                            ActionRequestValidator.validate(ActionRequest.ComposeSms(number, message))
+                            actions.composeSms(number, message)
+                            actionAudit.record("Compose SMS", "SMS composer opened; user controls sending")
+                            status = "SMS composer opened. Review the message before sending."
+                        } catch (e: Exception) { status = e.message ?: "Could not compose SMS." }
+                    },
+                    onSettings = { destination ->
+                        try {
+                            ActionRequestValidator.validate(ActionRequest.OpenSystemSettings(destination))
+                            actions.openSystemSettings(destination)
+                            actionAudit.record("Open settings", destination.name)
+                        } catch (e: Exception) { status = e.message ?: "Could not open Android settings." }
+                    },
+                    onHistory = { actionHistory = actionAudit.recent(); actionHistoryOpen = true }
+                )
             } else if (selectedTab == "memories") {
                 Spacer(Modifier.height(8.dp))
                 AuraMemoriesPage(
