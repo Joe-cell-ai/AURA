@@ -121,6 +121,7 @@ private fun AuraApp(activity: MainActivity) {
     var haDiscoverOpen by remember { mutableStateOf(false) }
     var haEntities by remember { mutableStateOf(emptyList<HomeAssistantEntity>()) }
     var showScheduledReminder by remember { mutableStateOf(false) }
+    var showReminder by remember { mutableStateOf(false) }
     var extensionsOpen by remember { mutableStateOf(false) }
     var actionHistoryOpen by remember { mutableStateOf(false) }
     var actionHistory by remember { mutableStateOf(emptyList<ActionAuditRecord>()) }
@@ -437,7 +438,6 @@ private fun AuraApp(activity: MainActivity) {
             }
             Spacer(Modifier.height(8.dp))
             Text("Actions require your tap; AI replies cannot execute device commands.", color = Color.Gray, fontSize = 11.sp)
-            var showReminder by remember { mutableStateOf(false) }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { showReminder = true }, modifier = Modifier.weight(1f)) { Text("Calendar") }
                 OutlinedButton(onClick = { showScheduledReminder = true }, enabled = extensionRefresh >= 0 && extensionGrants.isGranted("aura.reminders"), modifier = Modifier.weight(1f)) { Text("Schedule") }
