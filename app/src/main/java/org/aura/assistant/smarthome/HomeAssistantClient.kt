@@ -10,8 +10,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
 import org.json.JSONArray
 
-
 data class HomeAssistantEntity(val entityId: String, val friendlyName: String, val state: String)
+data class HomeAssistantConversationResult(val text: String, val conversationId: String?)
 
 object HomeAssistantRequestValidator {
     private val domains = setOf("light", "switch", "fan", "climate", "scene", "script")
@@ -24,6 +24,14 @@ object HomeAssistantRequestValidator {
             "Home Assistant must be an HTTPS origin without credentials, path, query or fragment."
         }
         return url.toString().trimEnd('/')
+    }
+
+    fun conversationText(value: String): String {
+        val prompt = value.trim()
+        require(prompt.isNotBlank() && prompt.length <= 2000) {
+            "Enter a message up to 2,000 characters."
+        }
+        return prompt
     }
 
     fun entityId(value: String): String {
@@ -49,6 +57,21 @@ object HomeAssistantRequestValidator {
     }
 }
 
+object HomeAssistantConversationParser {
+    fun parse(raw: String): HomeAssistantConversationResult {
+        val json = JSONObject(raw)
+        val responseObject = json.optJSONObject("response") ?: JSONObject()
+        val speech = responseObject.optJSONObject("speech")
+            ?.optJSONObject("plain")?.optString("speech").orEmpty()
+        val fallback = responseObject.optString("response")
+        val answer = speech.ifBlank { fallback }
+            .ifBlank { "Home Assistant completed the request." }
+        val id = json.optString("conversation_id")
+            .takeIf { it.isNotBlank() && it != "null" }
+        return HomeAssistantConversationResult(answer.take(4000), id)
+    }
+}
+
 class HomeAssistantClient {
     private val client = OkHttpClient()
 
@@ -64,15 +87,46 @@ class HomeAssistantClient {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) error("Home Assistant returned HTTP " + response.code)
                 val array = JSONArray(response.body?.string() ?: "[]")
-                val allowed = setOf("light", "switch", "fan", "climate", "scene", "script")
                 (0 until array.length()).mapNotNull { index ->
                     val item = array.optJSONObject(index) ?: return@mapNotNull null
-                    val id = runCatching { HomeAssistantRequestValidator.entityId(item.optString("entity_id")) }.getOrNull() ?: return@mapNotNull null
+                    val id = runCatching {
+                        HomeAssistantRequestValidator.entityId(item.optString("entity_id"))
+                    }.getOrNull() ?: return@mapNotNull null
                     val attrs = item.optJSONObject("attributes") ?: JSONObject()
-                    HomeAssistantEntity(id, attrs.optString("friendly_name", id).take(100), item.optString("state").take(80))
+                    HomeAssistantEntity(
+                        id,
+                        attrs.optString("friendly_name", id).take(100),
+                        item.optString("state").take(80)
+                    )
                 }.sortedBy { it.friendlyName.lowercase() }.take(200)
             }
         }
+
+    suspend fun processConversation(
+        baseUrl: String,
+        token: String,
+        text: String,
+        conversationId: String? = null,
+        language: String = "en"
+    ): HomeAssistantConversationResult = withContext(Dispatchers.IO) {
+        val safeBaseUrl = HomeAssistantRequestValidator.baseUrl(baseUrl)
+        require(token.isNotBlank()) { "Configure the Home Assistant token first." }
+        val prompt = HomeAssistantRequestValidator.conversationText(text)
+        val payload = JSONObject().put("text", prompt).put("language", language)
+        if (!conversationId.isNullOrBlank()) payload.put("conversation_id", conversationId)
+        val request = Request.Builder()
+            .url("$safeBaseUrl/api/conversation/process")
+            .header("Authorization", "Bearer $token")
+            .post(payload.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        client.newCall(request).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
+            if (!response.isSuccessful) {
+                error("Home Assistant conversation failed (HTTP ${response.code}).")
+            }
+            HomeAssistantConversationParser.parse(raw)
+        }
+    }
 
     suspend fun callService(baseUrl: String, token: String, domain: String, service: String, entityId: String) =
         withContext(Dispatchers.IO) {
