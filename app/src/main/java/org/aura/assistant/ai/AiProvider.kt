@@ -7,9 +7,7 @@ interface AiProvider {
     suspend fun generate(messages: List<ChatMessage>, options: GenerationOptions = GenerationOptions()): AiResult
 }
 
-data class ChatMessage(val role: Role, val content: String) {
-    enum class Role { SYSTEM, USER, ASSISTANT }
-}
+data class ChatMessage(val role: String, val content: String)
 
 data class GenerationOptions(val temperature: Float = 0.7f, val maxTokens: Int = 512)
 
