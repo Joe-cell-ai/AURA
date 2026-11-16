@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,7 +86,6 @@ private fun AuraApp(activity: MainActivity) {
     var settingsOpen by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Configure your own HTTPS AI endpoint in Settings to start.") }
     var speakReplies by remember { mutableStateOf(true) }
-    var packageName by remember { mutableStateOf("") }
     var showHaConfirm by remember { mutableStateOf(false) }
     var pendingHaService by remember { mutableStateOf("toggle") }
 
@@ -301,11 +301,11 @@ private fun SettingsScreen(
         Text("AI endpoint", color = Cyan, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(endpoint, onEndpoint, Modifier.fillMaxWidth(), label = { Text("HTTPS chat completions URL") }, singleLine = true)
         OutlinedTextField(model, onModel, Modifier.fillMaxWidth(), label = { Text("Model ID") }, singleLine = true)
-        OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true)
+        OutlinedTextField(apiKey, onApiKey, Modifier.fillMaxWidth(), label = { Text("API key (optional)") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
         Spacer(Modifier.height(16.dp))
         Text("Home Assistant (optional)", color = Cyan, fontWeight = FontWeight.SemiBold)
         OutlinedTextField(haUrl, onHaUrl, Modifier.fillMaxWidth(), label = { Text("HTTPS base URL") }, singleLine = true)
-        OutlinedTextField(haToken, onHaToken, Modifier.fillMaxWidth(), label = { Text("Long-lived access token") }, singleLine = true)
+        OutlinedTextField(haToken, onHaToken, Modifier.fillMaxWidth(), label = { Text("Long-lived access token") }, singleLine = true, visualTransformation = PasswordVisualTransformation())
         OutlinedTextField(haEntity, onHaEntity, Modifier.fillMaxWidth(), label = { Text("Entity ID e.g. light.living_room") }, singleLine = true)
         Spacer(Modifier.height(10.dp))
         Text("Never put a shared production API key in the APK. Use a trusted token-issuing backend for public deployments.",
