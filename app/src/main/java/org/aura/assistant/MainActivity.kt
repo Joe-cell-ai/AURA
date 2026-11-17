@@ -154,6 +154,8 @@ private fun AuraApp(activity: MainActivity) {
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var documentText by remember { mutableStateOf<String?>(null) }
     var attachmentStatus by remember { mutableStateOf("") }
+    var voiceSessionActive by remember { mutableStateOf(false) }
+    var voiceCaptureRequest by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         store.recent().forEach { messages += UiMessage(it.role, it.content) }
@@ -184,15 +186,24 @@ private fun AuraApp(activity: MainActivity) {
         } else status = "Notification permission is needed to deliver scheduled reminders."
     }
 
+    val buildSpeechIntent = {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            if (voiceLanguage != "system") putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguage)
+            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
+        }
+    }
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
         if (!spoken.isNullOrBlank()) {
-            when (val command = org.aura.assistant.voice.AssistantCommandParser.parse(spoken)) {
+            val parsedCommand = org.aura.assistant.voice.AssistantCommandParser.parse(spoken)
+            when (val command = parsedCommand) {
                 is org.aura.assistant.voice.AssistantCommand.OpenApp -> {
                     val launched = actions.launchAppByLabel(command.appName)
                     status = if (launched) "Opening ${command.appName}." else "I couldn't find ${command.appName}. Try its full app name."
                     if (launched) actionAudit.record("Open app", command.appName)
-                    selectedTab = "home"
+                    selectedTab = if (voiceSessionActive) "voice" else "home"
                     if (speakReplies) activity.speak(status)
                 }
                 is org.aura.assistant.voice.AssistantCommand.SetTimer -> {
@@ -244,7 +255,27 @@ private fun AuraApp(activity: MainActivity) {
                     status = "Speech captured. AURA is ready to answer."
                 }
             }
-        } else status = "No speech was captured. Try again when ready."
+            if (voiceSessionActive && parsedCommand != null) {
+                status = status + " Listening again…"
+                voiceCaptureRequest++
+            } else if (parsedCommand == null) {
+                voiceSessionActive = false
+            }
+        } else {
+            status = "No speech was captured. Try again when ready."
+            voiceSessionActive = false
+        }
+    }
+
+    LaunchedEffect(voiceCaptureRequest) {
+        if (voiceCaptureRequest > 0 && voiceSessionActive) {
+            try {
+                voiceLauncher.launch(buildSpeechIntent())
+            } catch (_: Exception) {
+                voiceSessionActive = false
+                status = "Speech recognition is unavailable. Voice session stopped."
+            }
+        }
     }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -342,17 +373,18 @@ private fun AuraApp(activity: MainActivity) {
             } else if (selectedTab == "voice") {
                 Spacer(Modifier.height(18.dp))
                 AuraVoicePanel(
+                    listening = voiceSessionActive,
                     onStart = {
-                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                            if (voiceLanguage != "system") putExtra(RecognizerIntent.EXTRA_LANGUAGE, voiceLanguage)
-                            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AURA")
-                        }
-                        status = "Listening… review the transcript before sending."
-                        try { voiceLauncher.launch(intent) } catch (_: Exception) { status = "Speech recognition is unavailable." }
+                        voiceSessionActive = true
+                        status = "Voice session started. Speak a phone command; AURA will listen again after it."
+                        voiceCaptureRequest++
                     },
-                    onStop = { activity.stopSpeaking(); selectedTab = "home" }
+                    onStop = {
+                        voiceSessionActive = false
+                        activity.stopSpeaking()
+                        selectedTab = "home"
+                        status = "Voice session stopped."
+                    }
                 )
             } else if (selectedTab == "actions") {
                 Spacer(Modifier.height(8.dp))
