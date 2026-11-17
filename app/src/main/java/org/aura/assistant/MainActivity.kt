@@ -186,9 +186,65 @@ private fun AuraApp(activity: MainActivity) {
 
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
-        selectedTab = "chat"
-        if (!spoken.isNullOrBlank()) { input = spoken; status = "Speech captured. Review it, then tap Send." }
-        else status = "No speech was captured. Try again when ready."
+        if (!spoken.isNullOrBlank()) {
+            when (val command = org.aura.assistant.voice.AssistantCommandParser.parse(spoken)) {
+                is org.aura.assistant.voice.AssistantCommand.OpenApp -> {
+                    val launched = actions.launchAppByLabel(command.appName)
+                    status = if (launched) "Opening ${command.appName}." else "I couldn't find ${command.appName}. Try its full app name."
+                    if (launched) actionAudit.record("Open app", command.appName)
+                    selectedTab = "home"
+                    if (speakReplies) activity.speak(status)
+                }
+                is org.aura.assistant.voice.AssistantCommand.SetTimer -> {
+                    try {
+                        actions.setTimer(command.durationMinutes, command.label)
+                        status = "Opening the timer for ${command.durationMinutes} minutes. Confirm it in Clock."
+                        actionAudit.record("Set timer", "${command.durationMinutes} minutes")
+                    } catch (e: Exception) { status = e.message ?: "Couldn't open the timer." }
+                    selectedTab = "home"
+                    if (speakReplies) activity.speak(status)
+                }
+                is org.aura.assistant.voice.AssistantCommand.SetAlarm -> {
+                    try {
+                        actions.setAlarm(command.hour, command.minute, command.label)
+                        status = "Opening the alarm for %02d:%02d. Confirm it in Clock.".format(command.hour, command.minute)
+                        actionAudit.record("Set alarm", "%02d:%02d".format(command.hour, command.minute))
+                    } catch (e: Exception) { status = e.message ?: "Couldn't open the alarm." }
+                    selectedTab = "home"
+                    if (speakReplies) activity.speak(status)
+                }
+                is org.aura.assistant.voice.AssistantCommand.OpenSettings -> {
+                    val destination = when (command.destination) {
+                        org.aura.assistant.voice.SettingsPage.WIFI -> org.aura.assistant.actions.SettingsDestination.WIFI
+                        org.aura.assistant.voice.SettingsPage.BLUETOOTH -> org.aura.assistant.actions.SettingsDestination.BLUETOOTH
+                        org.aura.assistant.voice.SettingsPage.SOUND -> org.aura.assistant.actions.SettingsDestination.SOUND
+                        org.aura.assistant.voice.SettingsPage.DISPLAY -> org.aura.assistant.actions.SettingsDestination.DISPLAY
+                        org.aura.assistant.voice.SettingsPage.LOCATION -> org.aura.assistant.actions.SettingsDestination.LOCATION
+                    }
+                    try {
+                        actions.openSystemSettings(destination)
+                        status = "Opening ${command.destination.name.lowercase()} settings."
+                        actionAudit.record("Open settings", command.destination.name)
+                    } catch (e: Exception) { status = e.message ?: "Couldn't open settings." }
+                    selectedTab = "home"
+                    if (speakReplies) activity.speak(status)
+                }
+                is org.aura.assistant.voice.AssistantCommand.DialNumber -> {
+                    try {
+                        actions.openDialler(command.phoneNumber)
+                        status = "Opening the dialler. Review the number before placing the call."
+                        actionAudit.record("Open dialler", "Dialler opened; user controls the call")
+                    } catch (e: Exception) { status = e.message ?: "Couldn't open the dialler." }
+                    selectedTab = "home"
+                    if (speakReplies) activity.speak(status)
+                }
+                null -> {
+                    selectedTab = "chat"
+                    input = spoken
+                    status = "Speech captured. AURA is ready to answer."
+                }
+            }
+        } else status = "No speech was captured. Try again when ready."
     }
 
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
