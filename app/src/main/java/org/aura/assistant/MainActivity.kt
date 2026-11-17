@@ -271,32 +271,18 @@ private fun AuraApp(activity: MainActivity) {
                 }
             }
             if (selectedTab == "home") {
-                Spacer(Modifier.height(12.dp))
-                AuraMicrophoneHero(
-                    onSpeak = { selectedTab = "voice" },
-                    status = if (status.startsWith("Configure")) "Ready when you are" else status
-                )
-                Spacer(Modifier.height(14.dp))
-                Text("QUICK ACTIONS", color = Color(0xFF9DB7D8), fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AuraQuickTile("Chat with AI", "●") { selectedTab = "chat" }
-                    AuraQuickTile("Smart Home", "⌂") {
+                Spacer(Modifier.height(18.dp))
+                AuraAssistantLanding(
+                    status = if (status.startsWith("Configure")) "Ready when you are" else status,
+                    onVoice = { selectedTab = "voice" },
+                    onAsk = { prompt -> input = prompt; selectedTab = "chat" },
+                    onReminder = { selectedTab = "automations"; showScheduledReminder = true },
+                    onSmartHome = {
                         selectedTab = "chat"
-                        status = if (haUrl.isBlank()) "Connect Home Assistant in Settings to use smart-home controls." else "Your Home Assistant controls are below."
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AuraQuickTile("Open Apps", "▦") { selectedTab = "chat"; status = "Enter an installed app package below to open it." }
-                    AuraQuickTile("Set Reminder", "▦") { selectedTab = "automations"; showScheduledReminder = true }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    AuraQuickTile("Search Web", "◎") { selectedTab = "chat"; status = "Enter a query in Chat and use Search web." }
-                    AuraQuickTile("More Actions", "•••") { actionHistory = actionAudit.recent(); actionHistoryOpen = true }
-                }
+                        status = if (haUrl.isBlank()) "Connect Home Assistant in Settings to control your home." else "Ask AURA to control your connected home."
+                    },
+                    onSettings = { settingsOpen = true }
+                )
             } else if (selectedTab == "voice") {
                 Spacer(Modifier.height(18.dp))
                 AuraVoicePanel(
