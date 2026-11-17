@@ -123,7 +123,7 @@ internal fun AuraVoicePanel(listening: Boolean, onStart: () -> Unit, onStop: () 
                 Text("🎙", fontSize = 58.sp)
             }
             Text(if (listening) "Speak a phone command. AURA will listen again after it finishes." else "Start a hands-free foreground session, or use one-shot voice input.", color = Color(0xFFD4D8F0), fontSize = 13.sp)
-            Button(onClick = onStart, colors = ButtonDefaults.buttonColors(containerColor = AuraViolet),
+            Button(onClick = onStart, enabled = !listening, colors = ButtonDefaults.buttonColors(containerColor = AuraViolet),
                 shape = RoundedCornerShape(28.dp), modifier = Modifier.width(200.dp).height(52.dp)) {
                 Text(if (listening) "Listening…" else "🎙  Start voice session", color = Color.White, fontWeight = FontWeight.Bold)
             }
