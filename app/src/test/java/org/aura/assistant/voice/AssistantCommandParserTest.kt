@@ -4,7 +4,13 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AssistantCommandParserTest {
-    @Test fun parsesNaturalReminderRequests() {\n        assertEquals(AssistantCommand.SetReminder("take medicine", 30), AssistantCommandParser.parse("remind me to take medicine in 30 minutes"))\n        assertNull(AssistantCommandParser.parse("remind me to call home in 0 minutes"))\n        assertNull(AssistantCommandParser.parse("remind me to call home in 20000 minutes"))\n    }\n\n    @Test fun parsesTimerAndOptionalLabel() {
+    @Test fun parsesNaturalReminderRequests() {
+        assertEquals(AssistantCommand.SetReminder("take medicine", 30), AssistantCommandParser.parse("remind me to take medicine in 30 minutes"))
+        assertNull(AssistantCommandParser.parse("remind me to call home in 0 minutes"))
+        assertNull(AssistantCommandParser.parse("remind me to call home in 20000 minutes"))
+    }
+
+    @Test fun parsesTimerAndOptionalLabel() {
         assertEquals(AssistantCommand.SetTimer(10, null), AssistantCommandParser.parse("set a timer for 10 minutes"))
         assertEquals(AssistantCommand.SetTimer(5, "tea"), AssistantCommandParser.parse("timer for 5 minutes called tea"))
     }
