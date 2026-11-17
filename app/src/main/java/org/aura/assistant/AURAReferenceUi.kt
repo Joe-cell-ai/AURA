@@ -112,22 +112,22 @@ internal fun AuraBottomNavigation(selected: String, onSelect: (String) -> Unit) 
 }
 
 @Composable
-internal fun AuraVoicePanel(onStart: () -> Unit, onStop: () -> Unit) {
+internal fun AuraVoicePanel(listening: Boolean, onStart: () -> Unit, onStop: () -> Unit) {
     Box(Modifier.fillMaxWidth().height(420.dp).background(
         Brush.linearGradient(listOf(Color(0xFF080D2B), Color(0xFF211052), Color(0xFF090E2B))), RoundedCornerShape(26.dp)
     ).padding(20.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            Text("Voice input", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            Text(if (listening) "Voice session active" else "Voice input", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
             Box(Modifier.size(150.dp).border(5.dp, Brush.linearGradient(listOf(AuraCyan, Color(0xFF526BFF), AuraViolet)), CircleShape)
                 .background(Color(0xFF17154D), CircleShape), contentAlignment = Alignment.Center) {
                 Text("🎙", fontSize = 58.sp)
             }
-            Text("Start Android speech recognition when you're ready", color = Color(0xFFD4D8F0), fontSize = 13.sp)
-            Button(onClick = onStart, colors = ButtonDefaults.buttonColors(containerColor = AuraViolet),
+            Text(if (listening) "Speak a phone command. AURA will listen again after it finishes." else "Start a hands-free foreground session, or use one-shot voice input.", color = Color(0xFFD4D8F0), fontSize = 13.sp)
+            Button(onClick = onStart, enabled = !listening, colors = ButtonDefaults.buttonColors(containerColor = AuraViolet),
                 shape = RoundedCornerShape(28.dp), modifier = Modifier.width(200.dp).height(52.dp)) {
-                Text("🎙  Start listening", color = Color.White, fontWeight = FontWeight.Bold)
+                Text(if (listening) "Listening…" else "🎙  Start voice session", color = Color.White, fontWeight = FontWeight.Bold)
             }
-            TextButton(onClick = onStop) { Text("Back to Home", color = Color(0xFFD4D8F0)) }
+            TextButton(onClick = onStop) { Text(if (listening) "Stop voice session" else "Back to Home", color = Color(0xFFD4D8F0)) }
         }
     }
 }
