@@ -270,6 +270,8 @@ private fun AuraApp(activity: MainActivity) {
     LaunchedEffect(voiceCaptureRequest) {
         if (voiceCaptureRequest > 0 && voiceSessionActive) {
             try {
+                kotlinx.coroutines.delay(1800)
+                if (!voiceSessionActive) return@LaunchedEffect
                 voiceLauncher.launch(buildSpeechIntent())
             } catch (_: Exception) {
                 voiceSessionActive = false
