@@ -206,6 +206,28 @@ private fun AuraApp(activity: MainActivity) {
                     selectedTab = if (voiceSessionActive) "voice" else "home"
                     if (speakReplies) activity.speak(status)
                 }
+                is org.aura.assistant.voice.AssistantCommand.SetReminder -> {
+                    scheduledTitle = command.title
+                    scheduledDelay = command.delayMinutes.toString()
+                    recurringRepeat = AutomationRepeat.ONCE
+                    if (Build.VERSION.SDK_INT >= 33 &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        status = "Allow notifications to schedule your reminder."
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        try {
+                            ActionRequestValidator.validate(ActionRequest.ScheduledReminder(command.title, command.delayMinutes.toLong()))
+                            ReminderScheduler(context).schedule(command.title, command.delayMinutes.toLong())
+                            actionAudit.record("Voice reminder", "Scheduled in ${command.delayMinutes} minutes")
+                            status = "Okay. I'll remind you to ${command.title} in ${command.delayMinutes} minutes."
+                        } catch (e: Exception) {
+                            status = e.message ?: "I couldn't schedule that reminder."
+                        }
+                        if (speakReplies) activity.speak(status)
+                    }
+                    selectedTab = "home"
+                }
                 is org.aura.assistant.voice.AssistantCommand.SetTimer -> {
                     try {
                         actions.setTimer(command.durationMinutes, command.label)
